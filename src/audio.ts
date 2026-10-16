@@ -1,8 +1,6 @@
-// Web Audio による効果音合成。素材ファイルを持たずに「映画っぽい電子音」を作るため全てオシレータとノイズで組む。
+// Web Audio による効果音合成。素材ファイルを持たずに済むよう全てオシレータとノイズで組む。
+// ゲーム的に聞こえないよう、音階のある電子音は控えめにし、実機の打鍵音・機械音・映画的なインパクトを中心にしている。
 // 自動再生制限のため AudioContext は最初のユーザー操作で生成し、それまでは全メソッドが無音で no-op になる。
-
-// 連打しても不協和にならないよう、キー音はペンタトニックに量子化する
-const PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24];
 
 export class Sfx {
   private ctx?: BaseAudioContext;
@@ -63,30 +61,38 @@ export class Sfx {
     if (ambient) this.startAmbient();
   }
 
+  /** サーバールームのような環境音。電源のハム（60Hz とその倍音）と、空調ファンの低い風切りで「機械のある部屋」にする */
   private startAmbient() {
     const ctx = this.ctx!;
     const g = ctx.createGain();
     g.gain.value = 0.0001;
-    g.gain.exponentialRampToValueAtTime(0.009, ctx.currentTime + 4);
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 180;
-    for (const [f, d] of [[55, 0], [55, 6], [82.4, -4]] as const) {
+    g.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 4);
+    g.connect(this.bus);
+    for (const [f, a] of [[60, 0.012], [120, 0.006], [180, 0.002]] as const) {
       const o = ctx.createOscillator();
-      o.type = 'sawtooth';
       o.frequency.value = f;
-      o.detune.value = d;
-      o.connect(lp);
+      const og = ctx.createGain();
+      og.gain.value = a;
+      o.connect(og).connect(g);
       o.start();
     }
-    // フィルタをゆっくり揺らして、ドローンが「呼吸」しているように聞かせる
+    const fan = ctx.createBufferSource();
+    fan.buffer = this.noise;
+    fan.loop = true;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 500;
+    const fg = ctx.createGain();
+    fg.gain.value = 0.02;
+    // ファンの回転ムラを模して、風切りの帯域をゆっくり揺らす
     const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.07;
+    lfo.frequency.value = 0.11;
     const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 70;
+    lfoGain.gain.value = 120;
     lfo.connect(lfoGain).connect(lp.frequency);
     lfo.start();
-    lp.connect(g).connect(this.bus);
+    fan.connect(lp).connect(fg).connect(g);
+    fan.start();
   }
 
   setMuted(m: boolean) {
@@ -136,7 +142,7 @@ export class Sfx {
     o.stop(t + (opts.a ?? 0.002) + dur + 0.05);
   }
 
-  private burst(dur: number, peak: number, type: BiquadFilterType, freq: number, opts: { at?: number; q?: number; sweepTo?: number; verb?: number } = {}) {
+  private burst(dur: number, peak: number, type: BiquadFilterType, freq: number, opts: { at?: number; q?: number; sweepTo?: number; verb?: number; a?: number } = {}) {
     const ctx = this.ctx!;
     const t = ctx.currentTime + (opts.at ?? 0);
     const src = ctx.createBufferSource();
@@ -148,7 +154,8 @@ export class Sfx {
     if (opts.sweepTo) f.frequency.exponentialRampToValueAtTime(opts.sweepTo, t + dur);
     f.Q.value = opts.q ?? 1;
     const g = ctx.createGain();
-    this.env(g, t, peak, 0.002, dur);
+    const a = opts.a ?? 0.002;
+    this.env(g, t, peak, a, dur);
     src.connect(f).connect(g).connect(this.bus);
     if (opts.verb) {
       const s = ctx.createGain();
@@ -156,85 +163,95 @@ export class Sfx {
       g.connect(s).connect(this.verb);
     }
     src.start(t, Math.random() * 0.5);
-    src.stop(t + dur + 0.05);
+    src.stop(t + a + dur + 0.05);
   }
 
-  /** キー入力：機械的なクリック + 音程のある電子ブリップ。勢いが増すほど音程が上がる */
+  /**
+   * 実機のメカニカルキーボードを模した打鍵音。電子音の音程を持たせるとゲームっぽくなるため、
+   * 「接点のカチッ」「キーキャップの樹脂の鳴り」「底打ちのコトッ」の 3 層をノイズだけで作り、毎回少しずつばらつかせる
+   */
+  private keyClick(v: number, body: number, thock: number) {
+    const r = Math.random;
+    this.burst(0.006, 0.5 * v, 'highpass', 3500 + r() * 2500, { a: 0.0005 });
+    this.burst(0.018, 0.35 * v, 'bandpass', body * (0.8 + r() * 0.4), { q: 6, at: 0.004, a: 0.0008 });
+    this.burst(0.03, 0.4 * v * thock, 'lowpass', 450 + r() * 200, { at: 0.008, a: 0.001 });
+  }
+
+  /** キー入力。強く速く叩いているほど、少しだけ強いタッチになる */
   key(intensity: number) {
     if (!this.budget()) return;
-    this.burst(0.025, 0.36, 'bandpass', 2500 + Math.random() * 2500, { q: 3 });
-    // 低い「コトッ」という胴鳴りを足して、電子音だけの軽さを消しメカニカルな打鍵感を出す
-    this.osc('sine', 230, 110, 0.03, 0.2);
-    const step = PENTA[Math.min(PENTA.length - 1, Math.floor(Math.random() * 5 + intensity * 6))];
-    const f = 660 * Math.pow(2, step / 12);
-    this.osc('square', f, f, 0.045, 0.1, { filter: 3500 });
+    this.keyClick((0.8 + Math.random() * 0.3) * (0.9 + intensity * 0.2), 1400 + Math.random() * 900, 1);
   }
 
   backspace() {
     if (!this.budget()) return;
-    this.osc('square', 440, 220, 0.05, 0.15, { filter: 2000 });
+    this.keyClick(0.9, 1000, 1);
   }
 
-  /** Enter：鋭い下降スイープ + 低音のドン */
+  /** Enter：大きめのキーを強く叩いた音 + 低いドンと空気の抜ける音で「実行した」重みを出す */
   enter() {
     if (!this.budget(20)) return;
-    this.osc('sawtooth', 1800, 90, 0.18, 0.09, { filter: 4000, verb: 0.3 });
-    this.osc('sine', 120, 40, 0.25, 0.35);
-    this.burst(0.08, 0.14, 'highpass', 3000);
+    this.keyClick(1.2, 800, 1.6);
+    this.osc('sine', 70, 38, 0.3, 0.4, { at: 0.01 });
+    this.burst(0.2, 0.12, 'bandpass', 6000, { q: 1.5, sweepTo: 700, at: 0.02, verb: 0.25 });
   }
 
-  /** ログ行：細かい電子音。間引かないとうるさいので最短間隔を設ける */
+  /** ログ行：リレーやディスクの細かい作動音。間引かないとうるさいので最短間隔を設ける */
   tick(cls: string) {
     if (!this.ctx || this.muted) return;
     const now = performance.now();
     if (now - this.lastTick < 45) return;
     this.lastTick = now;
-    const base = cls === 'dim' ? 2600 : 1800;
-    this.osc('sine', base + Math.random() * 800, base, 0.02, 0.09);
+    this.burst(0.004, cls === 'dim' ? 0.1 : 0.16, 'highpass', 5000 + Math.random() * 3000, { a: 0.0005 });
+    this.burst(0.008, 0.08, 'bandpass', 2000 + Math.random() * 1500, { q: 10, a: 0.0005 });
   }
 
+  /** 成功行：映画の端末 UI のような控えめな単発の確認音 */
   ok() {
     if (!this.budget()) return;
-    this.osc('triangle', 1318, 1318, 0.07, 0.16, { verb: 0.2 });
-    this.osc('triangle', 1976, 1976, 0.12, 0.14, { at: 0.07, verb: 0.3 });
+    this.osc('sine', 1568, 1568, 0.09, 0.1, { verb: 0.25 });
+    this.osc('sine', 3136, 3136, 0.05, 0.025);
   }
 
+  /** 警告行：低いシンセの二連パルス */
   warn() {
     if (!this.budget()) return;
-    for (let i = 0; i < 3; i++) {
-      this.osc('sawtooth', i % 2 ? 620 : 470, i % 2 ? 620 : 470, 0.11, 0.13, { at: i * 0.13, filter: 2500 });
+    for (let i = 0; i < 2; i++) {
+      this.osc('sawtooth', 98, 96, 0.14, 0.07, { at: i * 0.17, filter: 700 });
+      this.osc('sawtooth', 98.6, 96.6, 0.14, 0.07, { at: i * 0.17, filter: 700 });
     }
   }
 
-  /** 追跡アラーム：二音のサイレン */
+  /** 追跡アラーム：施設の警報のような低い「ブワーン」。音程差は 5 度にして不快すぎないようにする */
   alarm(level = 1) {
     if (!this.ctx || this.muted) return;
     for (let i = 0; i < 2; i++) {
-      this.osc('sawtooth', 700, 1050, 0.22, 0.2 * level, { at: i * 0.26, filter: 3000, verb: 0.2 });
+      for (const hz of [150, 225]) this.osc('sawtooth', hz, hz * 0.97, 0.32, 0.16 * level, { at: i * 0.42, filter: 1400, verb: 0.15, a: 0.02 });
     }
-    this.osc('sine', 60, 40, 0.3, 0.45 * level);
+    this.osc('sine', 50, 40, 0.4, 0.4 * level);
   }
 
-  /** 対抗措置：鋭いザップ。追跡が迫るほど音程が下がって緊迫感を出す */
+  /** 対抗措置：電気がはじけるような短い放電音。追跡が迫るほど低く鈍くなる */
   counter(danger: number) {
     if (!this.budget()) return;
-    const f = 2400 - danger * 1400 + Math.random() * 400;
-    this.osc('square', f, f / 3, 0.05, 0.15, { filter: 5000 });
-    this.burst(0.02, 0.2, 'highpass', 5000);
+    this.burst(0.05, 0.6, 'bandpass', 5000 + Math.random() * 2000, { q: 4, sweepTo: 900 - danger * 500, a: 0.0008 });
+    this.burst(0.004, 0.45, 'highpass', 6000, { a: 0.0005 });
   }
 
-  /** 進捗バー中の連続電子音（解析中の雰囲気） */
+  /** 解析中の読み取り音：ごく短く柔らかいサイン波を音階に乗せずランダムな高さで鳴らす */
   scanBlip(p: number) {
     if (!this.budget()) return;
-    this.osc('sine', 900 + p * 1400, 900 + p * 1400, 0.03, 0.1);
+    const f = 1800 + Math.random() * 1400 + p * 400;
+    this.osc('sine', f, f, 0.018, 0.06);
   }
 
-  /** ステージ突破：上昇アルペジオ */
+  /** ステージ突破：吸い込む風切り音 → 重い着地音 → 遠くで響く高音 */
   stageClear() {
     if (!this.ctx || this.muted) return;
-    const notes = [0, 7, 12, 19, 24];
-    notes.forEach((n, i) => this.osc('square', 440 * Math.pow(2, n / 12), 440 * Math.pow(2, n / 12), 0.12, 0.05, { at: i * 0.055, filter: 5000, verb: 0.4 }));
-    this.osc('sine', 80, 50, 0.4, 0.4);
+    this.burst(0.05, 0.18, 'bandpass', 400, { q: 2, sweepTo: 5000, a: 0.32 });
+    this.osc('sine', 80, 35, 0.6, 0.5, { at: 0.35, a: 0.004 });
+    this.burst(0.4, 0.35, 'lowpass', 1800, { sweepTo: 100, at: 0.35, verb: 0.4 });
+    this.osc('sine', 2637, 2637, 0.6, 0.05, { at: 0.36, verb: 0.6 });
   }
 
   /** 静寂：全体をダッキングし、かすかな上昇ノイズだけ残して緊張を作る */
@@ -272,11 +289,11 @@ export class Sfx {
     const f = ctx.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.setValueAtTime(200, t);
-    f.frequency.exponentialRampToValueAtTime(3200, t + 1.2);
+    f.frequency.exponentialRampToValueAtTime(1800, t + 1.2);
     f.frequency.exponentialRampToValueAtTime(400, t + 4);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.1, t + 0.15);
     g.gain.exponentialRampToValueAtTime(0.0001, t + 4.2);
     f.connect(g);
     g.connect(this.bus);
@@ -296,20 +313,23 @@ export class Sfx {
     }
   }
 
-  /** 画面グリッチに合わせたデジタルノイズ */
+  /** 画面グリッチ：データが壊れるような断続ノイズ + 電気的なハムのうなり */
   glitch() {
     if (!this.budget()) return;
-    for (let i = 0; i < 5; i++) this.osc('square', 80 + Math.random() * 2000, 60 + Math.random() * 300, 0.04, 0.1, { at: i * 0.03 });
-    this.burst(0.15, 0.22, 'bandpass', 1500, { q: 8, sweepTo: 6000 });
+    for (let i = 0; i < 8; i++) {
+      this.burst(0.01 + Math.random() * 0.015, 0.14, 'bandpass', 300 + Math.random() * 6000, { q: 5, at: i * 0.025 + Math.random() * 0.01, a: 0.001 });
+    }
+    this.osc('square', 50, 50, 0.14, 0.08, { filter: 600 });
   }
 
-  /** 文字が崩れ落ちるときの下降グリッチ */
+  /** 崩落：細かな粒が高い方から低い方へ崩れ、最後に地鳴りが残る */
   crumble() {
     if (!this.ctx || this.muted) return;
-    for (let i = 0; i < 6; i++) {
-      this.osc('square', 1200 - i * 150, 100, 0.25, 0.06, { at: i * 0.07, filter: 3000 });
+    for (let i = 0; i < 40; i++) {
+      const p = i / 40;
+      this.burst(0.006 + Math.random() * 0.01, 0.55 * (1 - p * 0.7), 'bandpass', 6000 * Math.pow(0.05, p) * (0.7 + Math.random() * 0.6), { q: 4, at: p * 1.4 + Math.random() * 0.03, a: 0.001 });
     }
-    this.burst(1.0, 0.16, 'bandpass', 4000, { sweepTo: 200, q: 4 });
+    this.burst(1.5, 0.35, 'lowpass', 400, { sweepTo: 60, a: 0.1 });
   }
 }
 

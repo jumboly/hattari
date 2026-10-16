@@ -37,12 +37,12 @@ npm test         # 自動テスト（Vitest）
 | 音 | RMS | 役割 |
 | --- | --- | --- |
 | boom（フィナーレ） | -8 | 最大の一撃 |
-| stageClear / alarm | -15.5 | 節目の大きな出来事 |
-| enter | -18 | 実行の手応え |
-| key / counter / ok | -29〜-30 | 打鍵・連打の主役 |
-| warn / glitch / crumble | -30〜-33 | 演出のアクセント |
-| scanBlip / tick | -37〜-39 | 処理中の質感 |
-| ambient | -40 | 背景のドローン |
+| stageClear / alarm | -13〜-15 | 節目の大きな出来事 |
+| enter | -16.5 | 実行の手応え |
+| warn / glitch / crumble / counter | -30〜-32 | 演出のアクセント |
+| key / ok | -32〜-33 | 打鍵（実機のメカニカルキーボード風） |
+| scanBlip / tick | -43〜-46 | 処理中の質感 |
+| ambient | -40 | サーバールームのハムとファン |
 
 ## 構成
 
