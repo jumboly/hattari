@@ -58,7 +58,7 @@ export class Hack {
   private ghost = false;
   private noiseBudget = 0;
   /** 出力が出るたびに呼ばれる（デジタルレインの反応などに使う） */
-  onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom' | 'trace' | 'evade') => void = () => {};
+  onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom' | 'trace' | 'evade' | 'rebuild') => void = () => {};
 
   constructor(
     private term: Terminal,
@@ -357,6 +357,9 @@ export class Hack {
 
   private beginFinale(now: number) {
     this.phase = 'locked';
+    // 万一の警報状態を持ち越さない（フィナーレは必ず静寂から始める）
+    this.sched.cancel('trace');
+    document.body.classList.remove('alert');
     this.queue = finaleLead(this.target);
     this.nextAt = now;
     // 大量の出力の後に「静寂」を挟み、一行と一撃で決める
@@ -391,6 +394,7 @@ export class Hack {
     this.term.line(`[*] Session archived. New construct detected: ${this.target.name} (${this.target.node})`, 'info');
     this.term.line('', 'dim');
     this.newPrompt();
+    this.onPulse('rebuild');
   }
 
   // ---------- 毎フレーム ----------

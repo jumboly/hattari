@@ -7,6 +7,7 @@ import { Hack } from './hack';
 import { layoutFor, Panels } from './panels';
 import { Rain } from './rain';
 import { Scheduler } from './sched';
+import { Shatter } from './shatter';
 import { Terminal } from './terminal';
 import { applyTheme, theme, THEMES } from './theme';
 
@@ -19,6 +20,8 @@ const hack = new Hack(term, fx, sched);
 const rain = new Rain($('rain') as HTMLCanvasElement);
 const demo = new Demo(hack);
 const panels = new Panels($('side'), hack);
+const shatter = new Shatter($('shatter') as HTMLCanvasElement, $('term'));
+shatter.onLand = (x, y) => rain.spawnAt(x, y);
 
 // 起動直後は少し待ってから自動進行を始め、静かにカーソルが点滅している「間」を見せる
 const FIRST_IDLE_MS = 5000;
@@ -41,7 +44,14 @@ hack.onPulse = (kind) => {
       rain.kick(20);
       break;
     case 'boom':
+      // 一撃と同時にターミナルを文字の雨へ崩す
+      rain.alert = false;
       rain.wave();
+      shatter.collapse();
+      break;
+    case 'rebuild':
+      shatter.rebuild();
+      rain.surge(2);
       break;
     case 'trace':
       rain.alert = true;
@@ -176,6 +186,8 @@ function frame(now: number) {
   panels.update(now, dt);
   rain.update(dt);
   rain.draw();
+  shatter.update(dt);
+  shatter.draw();
 
   renderHud();
   if (now - lastClock > 1000) {
@@ -189,4 +201,4 @@ hack.start();
 requestAnimationFrame(frame);
 
 // 自動テスト・デバッグ用に内部状態を覗けるようにする
-(window as unknown as { __hattari: unknown }).__hattari = { hack, term, sched, rain, demo, panels };
+(window as unknown as { __hattari: unknown }).__hattari = { hack, term, sched, rain, demo, panels, shatter };
