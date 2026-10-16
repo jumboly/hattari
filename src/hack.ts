@@ -18,6 +18,7 @@ import {
   type Step,
   type Target,
 } from './content';
+import { Director, type Scenario } from './cinema';
 import type { Fx } from './fx';
 import { chance, int, pick, rand } from './rand';
 import type { Scheduler } from './sched';
@@ -57,6 +58,10 @@ export class Hack {
   private lastCounter = 0;
   private ghost = false;
   private noiseBudget = 0;
+  /** シネマモードの台本。undefined ならフリー（ランダム進行） */
+  director?: Director;
+  onCaption: (text: string) => void = () => {};
+  onScenarioEnd: (sc: Scenario) => void = () => {};
   /** 出力が出るたびに呼ばれる（デジタルレインの反応などに使う） */
   onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom' | 'trace' | 'evade' | 'rebuild') => void = () => {};
 
@@ -203,7 +208,12 @@ export class Hack {
     this.typed = 0;
     // 適度にコードを書く場面を挟んで、コマンドの繰り返しによる単調さを崩す
     this.pendingCode = undefined;
-    if (this.runsSinceCode >= 2 && chance(0.35)) {
+    const beat = this.director?.beat;
+    if (beat) {
+      this.pendingCode = beat.code;
+      this.cmd = beat.code ? `vim ${beat.code.file}` : beat.cmd ?? pickCommand(this.stage.id, this.target);
+      this.onCaption(beat.caption);
+    } else if (this.runsSinceCode >= 2 && chance(0.35)) {
       this.pendingCode = pick(SNIPPETS);
       this.cmd = `vim ${this.pendingCode.file}`;
     } else {
@@ -230,8 +240,9 @@ export class Hack {
     }
     this.runsSinceCode++;
     // ときどき別系統の出力を後ろに足して、同じステージの繰り返しでも見え方を変える
-    const steps = scriptFor(this.stage.id, this.target);
-    if (chance(0.25)) steps.push(...bonusScript(this.target));
+    const beat = this.director?.beat;
+    const steps = beat ? (beat.script?.(this.target) ?? scriptFor(this.stage.id, this.target)) : scriptFor(this.stage.id, this.target);
+    if (!beat && chance(0.25)) steps.push(...bonusScript(this.target));
     this.run(steps, now);
   }
 
@@ -283,6 +294,18 @@ export class Hack {
   }
 
   private finishRun(now: number) {
+    if (this.director) {
+      // シネマモードでは展開を台本で決める
+      const after = this.director.beat.after ?? 'next';
+      this.director.next();
+      if (after === 'trace') this.startTrace();
+      else if (after === 'stage') this.stageClear(now);
+      else {
+        this.term.line('', 'dim');
+        this.newPrompt();
+      }
+      return;
+    }
     // 中盤で一度だけ「逆探知」を挟み、順調すぎる流れに危機と逆転を入れる
     if (this.stageIdx >= 1 && this.stageIdx <= 3 && this.tracedTarget !== this.target.name && chance(0.3)) {
       this.startTrace();
@@ -323,7 +346,7 @@ export class Hack {
     this.fx.banner('TRACE EVADED');
     this.term.line('[+] Sentinel lost the signal. You are a ghost again.', 'ok');
     this.onPulse('evade');
-    this.sched.after(1000, () => this.advance(this.sched.now), 'hack');
+    this.sched.after(1000, () => (this.director ? this.newPrompt() : this.advance(this.sched.now)), 'hack');
   }
 
   private advance(now: number) {
@@ -373,7 +396,7 @@ export class Hack {
       let i = int(0, FINALES.length - 1);
       if (i === this.lastFinale) i = (i + 1) % FINALES.length;
       this.lastFinale = i;
-      const f = FINALES[i];
+      const f = this.director?.scenario.finale ?? FINALES[i];
       sfx.boom();
       this.onPulse('boom');
       this.fx.flash('white');
@@ -387,6 +410,15 @@ export class Hack {
   private nextTarget() {
     document.body.classList.remove('afterglow');
     this.hushed = false;
+    if (this.director) {
+      // 台本の終わり。次に何をするか（FIN 表示・次の作品）は呼び出し側に任せる
+      const sc = this.director.scenario;
+      this.director = undefined;
+      this.stageIdx = 0;
+      this.onPulse('rebuild');
+      this.onScenarioEnd(sc);
+      return;
+    }
     this.target = newTarget(this.target);
     this.stageIdx = 0;
     this.progress = 0;
@@ -395,6 +427,47 @@ export class Hack {
     this.term.line('', 'dim');
     this.newPrompt();
     this.onPulse('rebuild');
+  }
+
+  // ---------- モード切替 ----------
+  /** フィナーレ中は切り替えると演出が壊れるので不可 */
+  get busy() {
+    return this.hushed || document.body.classList.contains('afterglow');
+  }
+
+  /** 進行中の処理を打ち切り、画面はそのまま次の流れを受け付けられる状態にする */
+  private interrupt() {
+    this.sched.cancel('hack');
+    this.sched.cancel('trace');
+    document.body.classList.remove('alert');
+    this.queue = [];
+    this.bar = undefined;
+    this.codeBox?.close();
+    this.promptLine?.done(this.cmd.slice(0, this.typed));
+    this.phase = 'locked';
+  }
+
+  startScenario(sc: Scenario, introMs: number) {
+    this.interrupt();
+    this.director = new Director(sc);
+    this.target = { ...sc.target };
+    this.stageIdx = 0;
+    this.progress = 0;
+    this.term.line('', 'dim');
+    this.term.line(`[*] ── ${sc.title} ──`, 'hi');
+    this.term.line('', 'dim');
+    this.sched.after(introMs, () => this.newPrompt(), 'hack');
+  }
+
+  stopScenario() {
+    this.interrupt();
+    this.director = undefined;
+    this.target = newTarget(this.target);
+    this.stageIdx = 0;
+    this.progress = 0;
+    this.term.line('', 'dim');
+    this.term.line(`[*] Free session. Construct detected: ${this.target.name} (${this.target.node})`, 'info');
+    this.newPrompt();
   }
 
   // ---------- 毎フレーム ----------

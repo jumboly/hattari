@@ -69,6 +69,24 @@ export class Fx {
     d.addEventListener('animationend', () => d.remove());
   }
 
+  /** 映画のタイトルカード。英字タイトルをデコード表示し、日本語の副題を添える */
+  titleCard(title: string, sub: string, ms: number) {
+    this.sched.cancel('title');
+    this.layer.querySelectorAll('.titlecard').forEach((n) => n.remove());
+    const d = document.createElement('div');
+    d.className = 'titlecard';
+    const t = document.createElement('div');
+    t.className = 'tc-title';
+    const s = document.createElement('div');
+    s.className = 'tc-sub';
+    s.textContent = sub;
+    d.append(t, s);
+    this.layer.appendChild(d);
+    this.decode(t, title, 900, 'title');
+    this.sched.after(ms - 600, () => d.classList.add('out'), 'title');
+    this.sched.after(ms, () => d.remove(), 'title');
+  }
+
   /** ステージ突破時の中規模バナー */
   banner(text: string, variant = '') {
     this.sched.cancel('banner');

@@ -177,6 +177,7 @@ body {
     opacity: 0;
   }
 }
+#modebtn,
 #theme,
 #mute {
   font: inherit;
@@ -186,6 +187,7 @@ body {
   padding: 2px 8px;
   cursor: pointer;
 }
+#modebtn:hover,
 #theme:hover,
 #mute:hover {
   color: var(--fg);
@@ -507,6 +509,103 @@ body.shattered #term {
   }
 }
 
+/* ---------- シネマモード ---------- */
+#stage {
+  transition: top 1s cubic-bezier(0.6, 0, 0.2, 1), bottom 1s cubic-bezier(0.6, 0, 0.2, 1), filter 0.4s ease, opacity 0.4s;
+}
+body.cinema #stage {
+  top: var(--lb);
+  bottom: var(--lb);
+}
+:root {
+  --lb: min(11vh, 96px);
+}
+#letterbox .lb {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #000;
+  z-index: 15;
+  transition: height 1s cubic-bezier(0.6, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#letterbox .top {
+  top: 0;
+}
+#letterbox .bottom {
+  bottom: 0;
+}
+body.cinema #letterbox .lb {
+  height: var(--lb);
+}
+#subtitle {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  font-size: clamp(14px, 1.7vw, 24px);
+  letter-spacing: 0.08em;
+  color: #f2f2f2;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+  padding: 0 16px;
+  text-align: center;
+}
+body:not(.cinema) #subtitle {
+  display: none;
+}
+/* 字幕は左から右へ書き出すように現れる */
+#subtitle.show {
+  animation: subIn 1.1s steps(24) both;
+}
+@keyframes subIn {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.titlecard {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(0, 0, 0, 0.82);
+  animation: tcIn 0.8s ease both;
+}
+.titlecard.out {
+  animation: tcOut 0.6s ease forwards;
+}
+.tc-title {
+  font-size: clamp(28px, 6vw, 96px);
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: var(--hi);
+  text-shadow: 0 0 12px var(--fg), 0 0 50px rgba(var(--fg-rgb), 0.5);
+  text-align: center;
+  padding: 0 16px;
+}
+.tc-sub {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  font-size: clamp(14px, 1.8vw, 24px);
+  letter-spacing: 0.4em;
+  color: var(--fg);
+  animation: tcIn 1.2s 0.7s ease both;
+}
+@keyframes tcIn {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes tcOut {
+  to {
+    opacity: 0;
+  }
+}
+
 #crt {
   position: fixed;
   inset: 0;
@@ -611,33 +710,7 @@ body.hush .st.now {
   animation-play-state: paused;
 }
 /* 追跡中：赤い警報色に染める */
-body.alert #shatter {
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 5;
-}
-body.shattered #term {
-  visibility: hidden;
-}
-/* 再構築：上から走査線が降りながら画面が組み上がる */
-#term.rebuild {
-  animation: rebuild 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-@keyframes rebuild {
-  0% {
-    clip-path: inset(0 0 100% 0);
-    filter: brightness(3) blur(1px);
-  }
-  70% {
-    clip-path: inset(0 0 0 0);
-    filter: brightness(1.5);
-  }
-}
-
-#crt {
+body.alert #crt {
   animation: alertPulse 1.15s ease-in-out infinite;
 }
 body.alert .st.now,

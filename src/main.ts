@@ -3,6 +3,7 @@ import { sfx } from './audio';
 import { STAGES } from './content';
 import { Demo } from './demo';
 import { Fx } from './fx';
+import { SCENARIOS } from './cinema';
 import { Hack } from './hack';
 import { layoutFor, Panels } from './panels';
 import { Rain } from './rain';
@@ -120,6 +121,55 @@ muteBtn.addEventListener('click', (e) => {
   // ボタンにフォーカスが残ると Space/Enter で再度トグルされてしまうため外す
   (e.currentTarget as HTMLElement).blur();
 });
+
+// ---------- シネマモード ----------
+const modeBtn = $('modebtn');
+const subtitle = $('subtitle');
+let scenarioIdx = 0;
+const TITLE_MS = 3800;
+
+function startCinema() {
+  sched.cancel('cinema');
+  const sc = SCENARIOS[scenarioIdx++ % SCENARIOS.length];
+  document.body.classList.add('cinema');
+  modeBtn.textContent = 'CINEMA';
+  subtitle.textContent = '';
+  sfx.stageClear();
+  fx.titleCard(sc.title, sc.sub, TITLE_MS);
+  hack.startScenario(sc, TITLE_MS + 300);
+}
+
+function stopCinema() {
+  sched.cancel('cinema');
+  document.body.classList.remove('cinema');
+  modeBtn.textContent = 'FREE';
+  hack.stopScenario();
+}
+
+modeBtn.addEventListener('click', (e) => {
+  (e.currentTarget as HTMLElement).blur();
+  sfx.unlock();
+  if (hack.busy) return;
+  if (hack.director || document.body.classList.contains('cinema')) stopCinema();
+  else startCinema();
+});
+
+hack.onCaption = (text) => {
+  subtitle.textContent = text;
+  subtitle.classList.remove('show');
+  void subtitle.offsetWidth;
+  subtitle.classList.add('show');
+};
+
+// 作品の終わりに FIN を出し、そのまま次の作品へ（シネマモードを抜けるまで上映し続ける）
+hack.onScenarioEnd = (sc) => {
+  subtitle.textContent = '';
+  fx.titleCard('FIN', sc.title, 3200);
+  sched.after(3400, () => {
+    if (document.body.classList.contains('cinema')) startCinema();
+    else hack.stopScenario();
+  }, 'cinema');
+};
 
 const themeBtn = $('theme');
 themeBtn.addEventListener('click', (e) => {

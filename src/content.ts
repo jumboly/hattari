@@ -77,8 +77,8 @@ export function pickCommand(stage: StageId, t: Target): string {
 }
 
 // ---------- 出力スクリプト ----------
-const L = (text: string, cls: LineCls = 'out', gap?: number): Step => ({ k: 'line', text, cls, gap });
-const bar = (label: string, ms = int(700, 1400)): Step => ({ k: 'bar', label, ms });
+export const L = (text: string, cls: LineCls = 'out', gap?: number): Step => ({ k: 'line', text, cls, gap });
+export const bar = (label: string, ms = int(700, 1400)): Step => ({ k: 'bar', label, ms });
 const pause = (ms: number): Step => ({ k: 'pause', ms });
 const ts = () => `[${String(int(10, 9999)).padStart(4, ' ')}.${String(int(0, 999999)).padStart(6, '0')}]`;
 const pct = () => `${int(60, 99)}.${int(0, 9)}%`;
