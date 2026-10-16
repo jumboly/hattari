@@ -250,6 +250,8 @@ function frame(now: number) {
 
 hack.start();
 requestAnimationFrame(frame);
+// CSS と初期描画が揃ってから見せる（起動時のちらつき防止）
+requestAnimationFrame(() => document.body.classList.add('ready'));
 
 // 自動テスト・デバッグ用に内部状態を覗けるようにする
 (window as unknown as { __hattari: unknown }).__hattari = { hack, term, sched, rain, demo, panels, shatter };

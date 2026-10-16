@@ -4,6 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HATTARI</title>
+    <style>
+      /* 本体の CSS は JS 経由で読み込まれるため、適用前の素の HTML が一瞬見えてしまう。
+         背景の黒と「準備ができるまで隠す」指定だけはここで先に効かせておく */
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      body:not(.ready) > * {
+        visibility: hidden;
+      }
+    </style>
   </head>
   <body>
     <canvas id="rain"></canvas>

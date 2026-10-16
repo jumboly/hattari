@@ -28,6 +28,17 @@ body {
   overflow: hidden;
 }
 
+/* 起動時は暗闇から静かに立ち上がる */
+body.ready #stage,
+body.ready #rain {
+  animation: boot 0.8s ease-out both;
+}
+@keyframes boot {
+  from {
+    opacity: 0;
+  }
+}
+
 #rain {
   position: fixed;
   inset: 0;
