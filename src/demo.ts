@@ -18,6 +18,7 @@ export class Demo {
   private mood: Mood = 'calm';
   private serial = -1;
   private waitingEnter = false;
+  private typo = 0;
 
   constructor(private hack: Hack) {}
 
@@ -69,7 +70,15 @@ export class Demo {
           this.nextAt = now + 200;
           return;
         }
+        if (this.typo > 0) {
+          this.typo--;
+          h.backspace();
+          this.nextAt = now + int(60, 120);
+          return;
+        }
         h.key(now);
+        // たまに打ち間違えて消す。完璧すぎる自動入力は機械っぽく見えるため
+        if (chance(0.025)) this.typo = int(1, 2);
         this.nextAt = now + this.gap();
         return;
       case 'code':

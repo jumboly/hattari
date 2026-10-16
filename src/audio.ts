@@ -53,9 +53,36 @@ export class Sfx {
       const verbGain = ctx.createGain();
       verbGain.gain.value = 0.35;
       this.verb.connect(verbGain).connect(this.bus);
+      this.startAmbient();
     } catch {
       this.ctx = undefined;
     }
+  }
+
+  private startAmbient() {
+    const ctx = this.ctx!;
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    g.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 4);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 180;
+    for (const [f, d] of [[55, 0], [55, 6], [82.4, -4]] as const) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = f;
+      o.detune.value = d;
+      o.connect(lp);
+      o.start();
+    }
+    // フィルタをゆっくり揺らして、ドローンが「呼吸」しているように聞かせる
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.07;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 70;
+    lfo.connect(lfoGain).connect(lp.frequency);
+    lfo.start();
+    lp.connect(g).connect(this.bus);
   }
 
   setMuted(m: boolean) {

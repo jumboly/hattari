@@ -89,8 +89,10 @@ export class Terminal {
     this.push(d);
     const head = `<span class="ps1">${esc(user)}</span><span class="ps2">:~$</span> `;
     return {
-      set: (text: string, hint = false) => {
-        d.innerHTML = `${head}<span class="cmd">${esc(text)}</span><span class="cursor"></span>${hint ? '<span class="hint">⏎ EXECUTE</span>' : ''}`;
+      // 直前の打鍵で増えた部分だけ光らせて、1 打ごとの手応えを目に見せる
+      set: (text: string, hint = false, freshFrom = text.length) => {
+        const f = Math.min(freshFrom, text.length);
+        d.innerHTML = `${head}<span class="cmd">${esc(text.slice(0, f))}<span class="fresh">${esc(text.slice(f))}</span></span><span class="cursor"></span>${hint ? '<span class="hint">⏎ EXECUTE</span>' : ''}`;
         this.scroll();
       },
       done: (text: string) => {

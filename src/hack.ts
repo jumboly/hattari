@@ -56,6 +56,7 @@ export class Hack {
   private tracedTarget = '';
   private lastCounter = 0;
   private ghost = false;
+  private noiseBudget = 0;
   /** 出力が出るたびに呼ばれる（デジタルレインの反応などに使う） */
   onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom' | 'trace' | 'evade') => void = () => {};
 
@@ -111,8 +112,9 @@ export class Hack {
             return;
           }
         }
+        const prev = this.typed;
         this.typed = Math.min(this.cmd.length, this.typed + this.charsPerKey());
-        this.promptLine?.set(this.cmd.slice(0, this.typed), this.typed >= this.cmd.length);
+        this.promptLine?.set(this.cmd.slice(0, this.typed), this.typed >= this.cmd.length, prev);
         break;
       }
       case 'code': {
@@ -124,7 +126,11 @@ export class Hack {
         // 実行中の連打は「処理を加速させている」感覚にする
         if (this.bar) this.bar.start -= this.bar.ms * 0.08;
         else this.nextAt = Math.min(this.nextAt, now);
-        if (chance(0.5) && this.queue.length < MAX_QUEUE) this.queue.unshift(noiseLine());
+        // ノイズ行は 1 回の実行につき上限を設け、本筋のログが埋もれないようにする
+        if (this.noiseBudget > 0 && chance(0.4) && this.queue.length < MAX_QUEUE) {
+          this.noiseBudget--;
+          this.queue.unshift(noiseLine());
+        }
         break;
       }
       case 'trace': {
@@ -242,6 +248,7 @@ export class Hack {
 
   private run(steps: Step[], now: number) {
     this.phase = 'running';
+    this.noiseBudget = 10;
     this.queue = steps;
     this.nextAt = now + 120;
   }

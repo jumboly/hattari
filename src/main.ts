@@ -70,7 +70,7 @@ function takeOver(now: number) {
     demo.stop();
     setMode(false);
     fx.toast('MANUAL OVERRIDE');
-  }
+  } else if (modeEl.textContent !== 'MANUAL') setMode(false);
 }
 
 window.addEventListener('keydown', (e) => {

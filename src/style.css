@@ -378,6 +378,10 @@ body {
 .prompt .cmd {
   color: var(--fg);
 }
+.prompt .fresh {
+  color: var(--hi);
+  text-shadow: 0 0 8px var(--hi), 0 0 20px var(--fg);
+}
 .cursor {
   display: inline-block;
   width: 0.6em;
@@ -408,7 +412,11 @@ body {
   border-color: var(--fg-faint);
   opacity: 0.75;
 }
-.codebox.closed .cursor {
+.codebox.closed .prompt .fresh {
+  color: var(--hi);
+  text-shadow: 0 0 8px var(--hi), 0 0 20px var(--fg);
+}
+.cursor {
   display: none;
 }
 .codehead {
@@ -713,6 +721,9 @@ body.afterglow #stage {
 }
 @media (max-width: 760px) {
   #pipeline,
+  #signal,
+  #clock,
+  .brand span,
   .tip {
     display: none;
   }
