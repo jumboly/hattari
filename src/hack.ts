@@ -58,6 +58,13 @@ export class Hack {
     private sched: Scheduler,
   ) {}
 
+  /** 新しいプロンプトが出るたびに増える。デモ側が「次の場面に移った」ことを知るため */
+  promptSerial = 0;
+
+  get awaitingEnter() {
+    return this.phase === 'prompt' && this.typed >= this.cmd.length;
+  }
+
   get stage() {
     return STAGES[Math.min(this.stageIdx, STAGES.length - 1)];
   }
@@ -172,6 +179,7 @@ export class Hack {
     } else {
       this.cmd = pickCommand(this.stage.id, this.target);
     }
+    this.promptSerial++;
     this.promptLine = this.term.prompt(USER);
     this.promptLine.set('');
   }

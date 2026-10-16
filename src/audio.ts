@@ -14,6 +14,10 @@ export class Sfx {
   private recentVoices: number[] = [];
   muted = false;
 
+  get unlocked() {
+    return !!this.ctx && this.ctx.state === 'running';
+  }
+
   /** ユーザー操作のイベントハンドラ内で呼ぶこと */
   unlock() {
     if (this.ctx) {

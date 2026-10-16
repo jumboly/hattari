@@ -6,6 +6,9 @@ const g = () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
 
 /** 画面全体に関わる演出（フラッシュ・揺れ・バナー・巨大文字） */
 export class Fx {
+  /** 巨大文字が崩れる瞬間、各文字の画面座標を通知する（デジタルレインへ変換するため） */
+  onCrumble: (pts: { x: number; y: number }[]) => void = () => {};
+
   constructor(
     private layer: HTMLElement,
     private stage: HTMLElement,
@@ -55,6 +58,16 @@ export class Fx {
     return chars;
   }
 
+  /** 画面上部の小さな通知（モード切替など） */
+  toast(text: string) {
+    this.layer.querySelectorAll('.toast').forEach((n) => n.remove());
+    const d = document.createElement('div');
+    d.className = 'toast';
+    d.textContent = text;
+    this.layer.appendChild(d);
+    d.addEventListener('animationend', () => d.remove());
+  }
+
   /** ステージ突破時の中規模バナー */
   banner(text: string) {
     this.sched.cancel('banner');
@@ -86,6 +99,12 @@ export class Fx {
     this.sched.after(3400, () => {
       sfx.crumble();
       d.classList.add('crumble');
+      this.onCrumble(
+        chars.map((c) => {
+          const r = c.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }),
+      );
       // 各文字をバラバラのタイミング・角度で落とし、「情報が文字の雨に崩れる」感じを出す
       [...chars, ...s.querySelectorAll<HTMLElement>('.ch')].forEach((c) => {
         const delay = Math.random() * 600;

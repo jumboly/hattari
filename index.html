@@ -6,11 +6,13 @@
     <title>HATTARI</title>
   </head>
   <body>
+    <canvas id="rain"></canvas>
     <div id="stage">
       <header id="hud">
         <div class="brand">HATTARI<span>//construct shell</span></div>
         <div id="pipeline"></div>
         <div class="right">
+          <div id="mode">AUTO</div>
           <div id="signal" title="typing intensity"></div>
           <div id="clock"></div>
           <button id="mute" type="button" aria-label="toggle sound">SND ON</button>
@@ -19,7 +21,7 @@
       <main id="term" aria-live="off"></main>
       <footer id="foot">
         <span id="target"></span>
-        <span class="tip">TYPE ANYTHING · ⏎ EXECUTE · MASH TO ACCELERATE</span>
+        <span class="tip"><span id="audiohint">CLICK OR TYPE TO ENABLE AUDIO · </span>TYPE ANYTHING · ⏎ EXECUTE · ESC AUTOPILOT</span>
       </footer>
     </div>
     <div id="fx"></div>
