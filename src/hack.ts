@@ -2,7 +2,9 @@
 // key() / enter() / backspace() を呼べば同じ演出が起きるようにしておき、モード切替で画面状態を引き継げるようにする。
 import { sfx } from './audio';
 import {
+  bonusScript,
   compileScript,
+  counterLine,
   EXTRA_FLAGS,
   FINALES,
   finaleLead,
@@ -21,7 +23,7 @@ import { chance, int, pick, rand } from './rand';
 import type { Scheduler } from './sched';
 import type { BarHandle, Terminal } from './terminal';
 
-type Phase = 'prompt' | 'code' | 'running' | 'locked';
+type Phase = 'prompt' | 'code' | 'running' | 'trace' | 'locked';
 
 const USER = 'ghost@construct';
 const MAX_QUEUE = 120;
@@ -49,8 +51,13 @@ export class Hack {
   private bar?: { h: BarHandle; start: number; ms: number; lastBlip: number };
   private runsSinceCode = 0;
   private lastFinale = -1;
+  /** 追跡レベル 0..100。追跡イベント中のみ意味を持つ */
+  trace = 0;
+  private tracedTarget = '';
+  private lastCounter = 0;
+  private ghost = false;
   /** 出力が出るたびに呼ばれる（デジタルレインの反応などに使う） */
-  onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom') => void = () => {};
+  onPulse: (kind: 'key' | 'enter' | 'line' | 'stage' | 'boom' | 'trace' | 'evade') => void = () => {};
 
   constructor(
     private term: Terminal,
@@ -120,6 +127,17 @@ export class Hack {
         if (chance(0.5) && this.queue.length < MAX_QUEUE) this.queue.unshift(noiseLine());
         break;
       }
+      case 'trace': {
+        // 連打 = 対抗措置。叩けば叩くほど追跡が押し戻される
+        this.trace = Math.max(0, this.trace - 1);
+        sfx.counter(this.trace / 100);
+        if (now - this.lastCounter > 75) {
+          this.lastCounter = now;
+          const c = counterLine();
+          this.term.line(c.text, c.cls);
+        }
+        break;
+      }
       case 'locked':
         break;
     }
@@ -146,8 +164,14 @@ export class Hack {
         sfx.enter();
         this.fx.shake();
         if (this.bar) this.bar.start -= this.bar.ms * 0.35;
-        for (let i = 0; i < 4; i++) this.nextAt = Math.min(this.nextAt, now);
+        this.nextAt = Math.min(this.nextAt, now);
         this.flush(now, 5);
+        break;
+      case 'trace':
+        sfx.enter();
+        this.fx.shake();
+        this.trace = Math.max(0, this.trace - 7);
+        this.term.line(`>>> PHASE SHIFT ${Math.random().toString(16).slice(2, 10).toUpperCase()} — signature rewritten`, 'hi');
         break;
       case 'locked':
         break;
@@ -199,7 +223,10 @@ export class Hack {
       return;
     }
     this.runsSinceCode++;
-    this.run(scriptFor(this.stage.id, this.target), now);
+    // ときどき別系統の出力を後ろに足して、同じステージの繰り返しでも見え方を変える
+    const steps = scriptFor(this.stage.id, this.target);
+    if (chance(0.25)) steps.push(...bonusScript(this.target));
+    this.run(steps, now);
   }
 
   private renderCode() {
@@ -249,6 +276,50 @@ export class Hack {
   }
 
   private finishRun(now: number) {
+    // 中盤で一度だけ「逆探知」を挟み、順調すぎる流れに危機と逆転を入れる
+    if (this.stageIdx >= 1 && this.stageIdx <= 3 && this.tracedTarget !== this.target.name && chance(0.3)) {
+      this.startTrace();
+      return;
+    }
+    this.advance(now);
+  }
+
+  private startTrace() {
+    this.tracedTarget = this.target.name;
+    this.phase = 'trace';
+    this.trace = 30;
+    this.ghost = false;
+    sfx.alarm();
+    this.fx.flash('red');
+    this.fx.glitch(450);
+    this.fx.shake(true);
+    this.fx.banner('SENTINEL LOCK-ON', 'alert');
+    document.body.classList.add('alert');
+    this.term.line('', 'dim');
+    this.term.line('[!] WARNING: Sentinel counter-trace detected', 'err');
+    this.term.line('[!] Origin triangulation in progress — DEPLOY DECOYS (MASH KEYS)', 'warn');
+    this.onPulse('trace');
+    const loop = () => {
+      if (this.phase !== 'trace') return;
+      sfx.alarm(0.5);
+      this.sched.after(1150, loop, 'trace');
+    };
+    this.sched.after(1150, loop, 'trace');
+  }
+
+  private evade() {
+    this.phase = 'locked';
+    this.sched.cancel('trace');
+    document.body.classList.remove('alert');
+    sfx.stageClear();
+    this.fx.flash('green');
+    this.fx.banner('TRACE EVADED');
+    this.term.line('[+] Sentinel lost the signal. You are a ghost again.', 'ok');
+    this.onPulse('evade');
+    this.sched.after(1000, () => this.advance(this.sched.now), 'hack');
+  }
+
+  private advance(now: number) {
     // 1 回の実行でステージの一部が進む。小さな成功と大きな成功を混ぜるために進み幅をばらつかせる
     this.progress += 0.45 + rand() * 0.45;
     if (this.progress >= 1) {
@@ -335,6 +406,23 @@ export class Hack {
         sfx.ok();
         this.nextAt = now + 60;
       }
+      return;
+    }
+    if (this.phase === 'trace') {
+      // 放置しても詰まないよう、95% に達したら自動の「ゴーストプロトコル」で振り切る
+      if (!this.ghost && this.trace >= 95) {
+        this.ghost = true;
+        this.fx.glitch(600);
+        this.term.line('[!] TRACE 95% — ENGAGING GHOST PROTOCOL', 'err');
+      }
+      // 打鍵で 0 まで押し戻した瞬間を逃さないよう、自然上昇より先に判定する
+      if (this.trace <= 0) {
+        this.trace = 0;
+        this.evade();
+        return;
+      }
+      // 叩いている間は追跡の伸びが鈍る。手を止めるとじわじわ迫ってくる
+      this.trace = this.ghost ? this.trace - dt * 0.08 : Math.min(99, this.trace + dt * 0.012 * (1 - this.intensity * 0.85));
       return;
     }
     if (this.phase !== 'running' && !(this.phase === 'locked' && this.queue.length)) return;

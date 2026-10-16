@@ -149,6 +149,33 @@ export function noiseLine(): Step {
   ])();
 }
 
+// 追跡に対する対抗措置のログ
+export function counterLine(): { text: string; cls: LineCls } {
+  return pick([
+    () => ({ text: `[+] decoy echo deployed via ${pick(['tokyo', 'oslo', 'lima', 'cairo', 'tallinn', 'perth'])}-relay`, cls: 'ok' as const }),
+    () => ({ text: `[+] phase signature rotated -> ${hex(8)}`, cls: 'ok' as const }),
+    () => ({ text: `[*] scrambling carrier ${hex(4)}:${hex(4)}`, cls: 'info' as const }),
+    () => ({ text: `[+] mirror node spawned at NODE-${hex(4).toUpperCase()}`, cls: 'ok' as const }),
+    () => ({ text: `${ts()} countermeasure ${hex(6)} active`, cls: 'dim' as const }),
+  ])();
+}
+
+// 本筋とは別に差し込む小イベント（データ転送・新ノード発見など）
+export function bonusScript(t: Target): Step[] {
+  return pick([
+    () => [
+      L(`[*] Memory palace exposed — siphoning ${int(2, 980)}.${int(0, 9)} ${pick(['TB', 'PB', 'EB'])}`, 'info'),
+      bar('Streaming memory palace', int(1200, 1800)),
+      L(`[+] Transfer complete — ${int(10, 99)}M fragments archived`, 'ok'),
+    ],
+    () => [
+      L(`[!] Unknown construct pinged back: NODE-${hex(4).toUpperCase()}`, 'warn'),
+      L(`[+] New node added to the mesh — ${int(2, 9)} hops from ${t.name}`, 'ok'),
+    ],
+    () => [L(`[*] Rerouting through ${int(3, 9)} relays to keep the link quiet`, 'info'), ...Array.from({ length: int(3, 5) }, () => noiseLine())],
+  ])();
+}
+
 export const finaleLead = (t: Target): Step[] => [
   L(`[*] All barriers down. Reaching for ${t.name}...`, 'hi'),
   pause(200),

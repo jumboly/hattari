@@ -188,16 +188,156 @@ body {
 }
 
 /* ---------- ターミナル ---------- */
+#main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 430px);
+  gap: 16px;
+  padding: 0 16px 0 max(16px, calc((100vw - 1600px) / 2));
+  min-height: 0;
+}
 #term {
   overflow: hidden;
-  padding: 18px max(20px, calc((100vw - 1180px) / 2));
-  font-size: clamp(12px, 1.05vw, 15px);
+  padding: 18px 20px;
+  font-size: clamp(12px, 1vw, 15px);
   line-height: 1.5;
   text-shadow: var(--glow);
   /* 古い行ほど暗く沈ませ、視線を最下行に集める */
   mask-image: linear-gradient(to bottom, transparent 0, #000 35%);
   /* 雨の上でも文字が読めるよう、ターミナル部分だけ暗幕を敷く */
-  background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.7) max(20px, calc((100vw - 1180px) / 2)), rgba(0, 0, 0, 0.7) calc(100% - max(20px, calc((100vw - 1180px) / 2))), transparent);
+  background: rgba(0, 0, 0, 0.76);
+  min-height: 0;
+}
+
+/* ---------- サブウィンドウ ---------- */
+#side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0;
+  min-height: 0;
+}
+.panel {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--fg-dim);
+  background: rgba(0, 12, 5, 0.86);
+  box-shadow: 0 0 30px rgba(61, 255, 127, 0.08), inset 0 0 20px rgba(61, 255, 127, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+.panel > header {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 8px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: #000;
+  background: var(--fg-dim);
+}
+.pbody {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  padding: 6px 8px;
+  font-size: 11px;
+  overflow: hidden;
+}
+.pbody canvas {
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+}
+.p-glyph pre {
+  margin: 0;
+  font: inherit;
+  line-height: 1.35;
+  color: var(--fg-dim);
+}
+.p-glyph i {
+  font-style: normal;
+  color: var(--fg-faint);
+}
+.p-glyph b {
+  color: var(--hi);
+  text-shadow: var(--glow);
+}
+.kgrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 8px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+.kgrid span {
+  color: var(--fg-dim);
+  text-align: center;
+}
+.kgrid span.lock {
+  color: #000;
+  background: var(--fg);
+  box-shadow: 0 0 8px var(--fg);
+  animation: lockIn 0.35s ease-out;
+}
+.klabel {
+  margin-top: 10px;
+  color: var(--fg);
+  text-shadow: var(--glow);
+}
+.p-trace {
+  border-color: var(--err);
+  box-shadow: 0 0 40px rgba(255, 59, 92, 0.3);
+}
+.p-trace > header {
+  background: var(--err);
+  animation: blink 0.5s steps(1) infinite;
+}
+.tbig {
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--err);
+  text-shadow: 0 0 12px var(--err);
+  text-align: center;
+}
+.tbar {
+  height: 8px;
+  border: 1px solid var(--err);
+  margin: 6px 0 10px;
+}
+.tbar i {
+  display: block;
+  height: 100%;
+  background: var(--err);
+  box-shadow: 0 0 10px var(--err);
+  transition: width 0.1s linear;
+}
+.thops {
+  line-height: 1.8;
+  color: rgba(255, 59, 92, 0.4);
+}
+.thops .hit {
+  color: #ffd0d8;
+  text-shadow: 0 0 6px var(--err);
+}
+
+/* 雨から組み上がるように現れ、雨へと崩れて消える */
+.panel.materialize {
+  animation: materialize 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.panel.materialize::after,
+.panel.dissolve::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(61, 255, 127, 0.5) 0 1px, transparent 1px 6px);
+  animation: scanOut 0.9s ease-out forwards;
+}
+.panel.dissolve {
+  animation: dissolve 0.55s ease-in forwards;
 }
 .ln {
   white-space: pre;
@@ -419,11 +559,67 @@ body.hush .cursor,
 body.hush .st.now {
   animation-play-state: paused;
 }
+/* 追跡中：赤い警報色に染める */
+body.alert #crt {
+  animation: alertPulse 1.15s ease-in-out infinite;
+}
+body.alert .st.now,
+body.alert #mode {
+  color: var(--err);
+  border-color: var(--err);
+  text-shadow: 0 0 6px var(--err);
+}
+body.alert #hud,
+body.alert #foot {
+  border-color: rgba(255, 59, 92, 0.4);
+}
+.banner.alert .banner-text {
+  color: #ffe0e6;
+  border-color: var(--err);
+  background: rgba(30, 0, 6, 0.88);
+  text-shadow: 0 0 10px var(--err), 0 0 30px rgba(255, 59, 92, 0.6);
+  box-shadow: 0 0 60px rgba(255, 59, 92, 0.35);
+}
+
 body.afterglow #stage {
   filter: brightness(0.35);
   transition: filter 1.8s ease;
 }
 
+@keyframes materialize {
+  0% {
+    clip-path: inset(0 0 100% 0);
+    filter: brightness(3) blur(2px);
+  }
+  60% {
+    clip-path: inset(0 0 0 0);
+    filter: brightness(1.6);
+  }
+}
+@keyframes scanOut {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes dissolve {
+  to {
+    clip-path: inset(100% 0 0 0);
+    transform: translateY(30px);
+    filter: brightness(2) blur(3px);
+    opacity: 0;
+  }
+}
+@keyframes lockIn {
+  from {
+    background: var(--hi);
+    transform: scale(1.3);
+  }
+}
+@keyframes alertPulse {
+  50% {
+    box-shadow: inset 0 0 160px rgba(255, 30, 60, 0.45);
+  }
+}
 @keyframes blink {
   50% {
     opacity: 0;
@@ -507,6 +703,14 @@ body.afterglow #stage {
   }
 }
 
+@media (max-width: 1000px) {
+  #main {
+    grid-template-columns: 1fr;
+  }
+  #side {
+    display: none;
+  }
+}
 @media (max-width: 760px) {
   #pipeline,
   .tip {

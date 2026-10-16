@@ -173,6 +173,23 @@ export class Sfx {
     }
   }
 
+  /** 追跡アラーム：二音のサイレン */
+  alarm(level = 1) {
+    if (!this.ctx || this.muted) return;
+    for (let i = 0; i < 2; i++) {
+      this.osc('sawtooth', 700, 1050, 0.22, 0.09 * level, { at: i * 0.26, filter: 3000, verb: 0.2 });
+    }
+    this.osc('sine', 60, 40, 0.3, 0.3 * level);
+  }
+
+  /** 対抗措置：鋭いザップ。追跡が迫るほど音程が下がって緊迫感を出す */
+  counter(danger: number) {
+    if (!this.budget()) return;
+    const f = 2400 - danger * 1400 + Math.random() * 400;
+    this.osc('square', f, f / 3, 0.05, 0.04, { filter: 5000 });
+    this.burst(0.02, 0.06, 'highpass', 5000);
+  }
+
   /** 進捗バー中の連続電子音（解析中の雰囲気） */
   scanBlip(p: number) {
     if (!this.budget()) return;
@@ -244,6 +261,13 @@ export class Sfx {
         o.stop(t + 4.3);
       }
     }
+  }
+
+  /** 画面グリッチに合わせたデジタルノイズ */
+  glitch() {
+    if (!this.budget()) return;
+    for (let i = 0; i < 5; i++) this.osc('square', 80 + Math.random() * 2000, 60 + Math.random() * 300, 0.04, 0.05, { at: i * 0.03 });
+    this.burst(0.15, 0.12, 'bandpass', 1500, { q: 8, sweepTo: 6000 });
   }
 
   /** 文字が崩れ落ちるときの下降グリッチ */

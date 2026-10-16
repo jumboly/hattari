@@ -87,6 +87,16 @@ export class Demo {
           this.nextAt = now + int(150, 400);
         }
         return;
+      case 'trace':
+        // 追跡されたら必死に叩く。たまに考える間を入れて「押し返される」瞬間も作る
+        if (chance(0.03)) {
+          this.nextAt = now + int(300, 700);
+          return;
+        }
+        if (chance(0.08)) h.enter(now);
+        else h.key(now);
+        this.nextAt = now + int(60, 110);
+        return;
       case 'locked':
         this.nextAt = now + 200;
         return;

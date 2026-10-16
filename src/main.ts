@@ -4,6 +4,7 @@ import { STAGES } from './content';
 import { Demo } from './demo';
 import { Fx } from './fx';
 import { Hack } from './hack';
+import { layoutFor, Panels } from './panels';
 import { Rain } from './rain';
 import { Scheduler } from './sched';
 import { Terminal } from './terminal';
@@ -16,6 +17,7 @@ const fx = new Fx($('fx'), $('stage'), sched);
 const hack = new Hack(term, fx, sched);
 const rain = new Rain($('rain') as HTMLCanvasElement);
 const demo = new Demo(hack);
+const panels = new Panels($('side'), hack);
 
 // 起動直後は少し待ってから自動進行を始め、静かにカーソルが点滅している「間」を見せる
 const FIRST_IDLE_MS = 5000;
@@ -40,7 +42,19 @@ hack.onPulse = (kind) => {
     case 'boom':
       rain.wave();
       break;
+    case 'trace':
+      rain.alert = true;
+      rain.surge(3);
+      break;
+    case 'evade':
+      rain.alert = false;
+      rain.wave();
+      break;
   }
+};
+// 消えるウィンドウを文字の雨に崩す
+panels.onDissolve = (r) => {
+  for (let x = r.left; x < r.right; x += 14) rain.spawnAt(x + Math.random() * 10, r.top + Math.random() * r.height);
 };
 fx.onCrumble = (pts) => pts.forEach((p) => rain.spawnAt(p.x, p.y));
 
@@ -146,6 +160,9 @@ function frame(now: number) {
   rain.speedTarget = 0.8 + hack.intensity * 1.6;
   // 誰も触っていない時は雨を主役に、打鍵中はターミナルを主役にする
   rain.alphaTarget = hack.hushed ? 0.18 : document.body.classList.contains('afterglow') ? 1 : 0.38 + (1 - hack.intensity) * 0.22;
+  // フィナーレ中はウィンドウを全部崩し、次のターゲットで雨から再構成する
+  panels.set(hack.hushed || document.body.classList.contains('afterglow') ? [] : layoutFor(hack));
+  panels.update(now, dt);
   rain.update(dt);
   rain.draw();
 
@@ -161,4 +178,4 @@ hack.start();
 requestAnimationFrame(frame);
 
 // 自動テスト・デバッグ用に内部状態を覗けるようにする
-(window as unknown as { __hattari: unknown }).__hattari = { hack, term, sched, rain, demo };
+(window as unknown as { __hattari: unknown }).__hattari = { hack, term, sched, rain, demo, panels };

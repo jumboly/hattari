@@ -30,6 +30,8 @@ export class Rain {
   alpha = 0.55;
   alphaTarget = 0.55;
   frozen = false;
+  /** 追跡中は赤い雨にして危機感を出す */
+  alert = false;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -121,7 +123,7 @@ export class Rain {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const heads: Drop[] = [];
-    ctx.fillStyle = '#2bff6e';
+    ctx.fillStyle = this.alert ? '#ff2a4f' : '#2bff6e';
     for (const list of [this.drops, this.extras]) {
       for (const d of list) {
         const head = Math.floor(d.y);
@@ -139,8 +141,8 @@ export class Rain {
       }
     }
     // 先頭文字だけ白く光らせる。shadowBlur は高価なので先頭のみに限定する
-    ctx.fillStyle = '#e6fff0';
-    ctx.shadowColor = '#3dff7f';
+    ctx.fillStyle = this.alert ? '#ffe0e6' : '#e6fff0';
+    ctx.shadowColor = this.alert ? '#ff3b5c' : '#3dff7f';
     ctx.shadowBlur = 10;
     for (const d of heads) {
       const r = Math.floor(d.y);

@@ -31,6 +31,7 @@ export class Fx {
   }
 
   glitch(ms = 220) {
+    if (ms >= 300) sfx.glitch();
     this.stage.classList.add('glitch');
     this.sched.cancel('glitch');
     this.sched.after(ms, () => this.stage.classList.remove('glitch'), 'glitch');
@@ -69,11 +70,11 @@ export class Fx {
   }
 
   /** ステージ突破時の中規模バナー */
-  banner(text: string) {
+  banner(text: string, variant = '') {
     this.sched.cancel('banner');
     this.layer.querySelectorAll('.banner').forEach((n) => n.remove());
     const d = document.createElement('div');
-    d.className = 'banner';
+    d.className = `banner ${variant}`;
     const inner = document.createElement('div');
     inner.className = 'banner-text';
     d.appendChild(inner);
