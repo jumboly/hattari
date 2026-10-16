@@ -3,6 +3,7 @@
 import { sfx } from './audio';
 import type { Hack } from './hack';
 import { hex, int, pick, rand } from './rand';
+import { theme } from './theme';
 
 export type PanelId = 'mesh' | 'glyph' | 'decrypt' | 'monitor' | 'trace';
 
@@ -12,10 +13,11 @@ interface Panel {
   update(now: number, dt: number): void;
 }
 
-const G = '#3dff7f';
-const G_DIM = 'rgba(61,255,127,0.28)';
-const HI = '#e6fff0';
-const RED = '#ff3b5c';
+// テーマ切替に追従させるため、色は描画のたびにテーマから引く
+let G = '', G_DIM = '', HI = '', RED = '';
+function syncColors() {
+  ({ fg: G, dim: G_DIM, hi: HI, alert: RED } = theme.canvas);
+}
 
 function shell(id: PanelId, title: string): { el: HTMLElement; body: HTMLElement } {
   const el = document.createElement('section');
@@ -142,8 +144,10 @@ class MeshPanel implements Panel {
       }
     });
     // レーダー風の走査線
-    ctx.fillStyle = 'rgba(61,255,127,0.07)';
+    ctx.fillStyle = G;
+    ctx.globalAlpha = 0.07;
     ctx.fillRect(this.sweep * w - 30, 0, 30, H);
+    ctx.globalAlpha = 1;
     ctx.font = '10px monospace';
     ctx.fillStyle = HI;
     const [tx, ty] = P(1);
@@ -369,6 +373,7 @@ export class Panels {
   update(now: number, dt: number) {
     // サイドが非表示（狭い画面）の時は描画を省く
     if (!this.root.offsetParent) return;
+    syncColors();
     for (const p of this.live.values()) p.update(now, dt);
   }
 }

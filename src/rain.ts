@@ -1,7 +1,10 @@
 // デジタルレイン。背景ではなく「演出に反応する楽器」として、外部から加速・停止・噴出を指示できるようにする。
 // 毎フレーム全消去して描き直す方式にしているのは、残像を半透明塗りで作る方式だと「完全停止」した瞬間の静止画が作れないため。
 
-const GLYPHS = 'ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ0123456789Z:."=*+-<>¦╌';
+import { theme } from './theme';
+
+// グリッドには文字インデックスだけを持ち、実際の文字はテーマの文字セットから引く（テーマ切替で即座に変わる）
+const GLYPH_SLOTS = 64;
 const MAX_EXTRA = 220;
 
 interface Drop {
@@ -49,7 +52,7 @@ export class Rain {
     this.cell = w < 700 ? 14 : 18;
     const cols = Math.ceil(w / this.cell);
     this.rows = Math.ceil(h / this.cell) + 1;
-    this.grid = new Uint8Array(cols * this.rows).map(() => Math.floor(Math.random() * GLYPHS.length));
+    this.grid = new Uint8Array(cols * this.rows).map(() => Math.floor(Math.random() * GLYPH_SLOTS));
     if (cols !== this.cols) {
       this.cols = cols;
       this.drops = Array.from({ length: cols }, (_, c) => this.fresh(c, Math.random() * this.rows * 1.6 - this.rows * 0.6));
@@ -112,7 +115,7 @@ export class Rain {
     this.extras = this.extras.filter((d) => d.y - d.len <= this.rows);
     // 文字が時々入れ替わることで「流れているデータ」に見せる
     const muts = Math.floor(this.grid.length * 0.01 * this.speed);
-    for (let i = 0; i < muts; i++) this.grid[Math.floor(Math.random() * this.grid.length)] = Math.floor(Math.random() * GLYPHS.length);
+    for (let i = 0; i < muts; i++) this.grid[Math.floor(Math.random() * this.grid.length)] = Math.floor(Math.random() * GLYPH_SLOTS);
   }
 
   draw() {
@@ -123,7 +126,9 @@ export class Rain {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const heads: Drop[] = [];
-    ctx.fillStyle = this.alert ? '#ff2a4f' : '#2bff6e';
+    const glyphs = theme.rain.glyphs;
+    const G = (i: number) => glyphs[i % glyphs.length];
+    ctx.fillStyle = this.alert ? '#ff2a4f' : theme.rain.body;
     for (const list of [this.drops, this.extras]) {
       for (const d of list) {
         const head = Math.floor(d.y);
@@ -135,19 +140,19 @@ export class Rain {
           if (r >= this.rows) continue;
           const f = 1 - i / d.len;
           ctx.globalAlpha = this.alpha * f * f * (0.8 + d.bright * 0.6);
-          ctx.fillText(GLYPHS[this.grid[d.col * this.rows + r]], x, r * cell);
+          ctx.fillText(G(this.grid[d.col * this.rows + r]), x, r * cell);
         }
         if (head < this.rows) heads.push(d);
       }
     }
     // 先頭文字だけ白く光らせる。shadowBlur は高価なので先頭のみに限定する
-    ctx.fillStyle = this.alert ? '#ffe0e6' : '#e6fff0';
-    ctx.shadowColor = this.alert ? '#ff3b5c' : '#3dff7f';
+    ctx.fillStyle = this.alert ? '#ffe0e6' : theme.rain.head;
+    ctx.shadowColor = this.alert ? '#ff3b5c' : theme.rain.glow;
     ctx.shadowBlur = 10;
     for (const d of heads) {
       const r = Math.floor(d.y);
       ctx.globalAlpha = Math.min(1, this.alpha * (1.3 + d.bright));
-      ctx.fillText(GLYPHS[this.grid[d.col * this.rows + r]], d.col * cell + cell / 2, r * cell);
+      ctx.fillText(G(this.grid[d.col * this.rows + r]), d.col * cell + cell / 2, r * cell);
     }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;

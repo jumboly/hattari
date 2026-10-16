@@ -8,6 +8,7 @@ import { layoutFor, Panels } from './panels';
 import { Rain } from './rain';
 import { Scheduler } from './sched';
 import { Terminal } from './terminal';
+import { applyTheme, theme, THEMES } from './theme';
 
 const $ = (id: string) => document.getElementById(id)!;
 
@@ -107,6 +108,16 @@ muteBtn.addEventListener('click', (e) => {
   sfx.setMuted(!sfx.muted);
   muteBtn.textContent = sfx.muted ? 'SND OFF' : 'SND ON';
   // ボタンにフォーカスが残ると Space/Enter で再度トグルされてしまうため外す
+  (e.currentTarget as HTMLElement).blur();
+});
+
+const themeBtn = $('theme');
+themeBtn.addEventListener('click', (e) => {
+  const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+  applyTheme(next);
+  themeBtn.textContent = next.label;
+  fx.flash('white');
+  rain.wave();
   (e.currentTarget as HTMLElement).blur();
 });
 
