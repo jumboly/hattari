@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HATTARI Sound Lab</title>
+    <style>
+      body { margin: 0; padding: 24px; background: #000; color: #3dff7f; font: 14px/1.6 Menlo, monospace; }
+      h1 { font-size: 18px; letter-spacing: .3em; }
+      h2 { font-size: 14px; margin-top: 28px; color: #e6fff0; }
+      table { border-collapse: collapse; }
+      td, th { padding: 4px 12px; border-bottom: 1px solid #0f3d22; text-align: left; }
+      th { color: #1d7d43; font-weight: 400; }
+      button { font: inherit; color: #3dff7f; background: none; border: 1px solid #1d7d43; padding: 2px 10px; cursor: pointer; }
+      button:hover { border-color: #3dff7f; background: #0f3d22; }
+      .hot { color: #ffd23d; } .cold { color: #1d7d43; }
+      p { color: #1d7d43; max-width: 760px; }
+    </style>
+  </head>
+  <body>
+    <h1>HATTARI // SOUND LAB</h1>
+    <p>各効果音と典型的な場面を単体で試聴できます。数値はオフラインで書き出した音の最大音量（短時間 RMS / ピーク、dBFS）です。</p>
+    <div><label><input type="checkbox" id="amb" /> 環境音（低音ドローン）を鳴らす</label></div>
+    <h2>SCENES</h2>
+    <table id="scenes"></table>
+    <h2>SOUNDS</h2>
+    <table id="sounds"></table>
+    <script type="module" src="/src/lab.ts"></script>
+  </body>
+</html>

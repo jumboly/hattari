@@ -5,7 +5,7 @@
 const PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24];
 
 export class Sfx {
-  private ctx?: AudioContext;
+  private ctx?: BaseAudioContext;
   private master!: GainNode;
   private bus!: GainNode; // ダッキング用（静寂演出）
   private verb!: ConvolverNode;
@@ -21,49 +21,53 @@ export class Sfx {
   /** ユーザー操作のイベントハンドラ内で呼ぶこと */
   unlock() {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.ctx instanceof AudioContext && this.ctx.state === 'suspended') void this.ctx.resume();
       return;
     }
     try {
-      const ctx = new AudioContext();
-      this.ctx = ctx;
-      // 音が重なっても割れたりうるさくなりすぎないよう、最終段にコンプレッサーを置く
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -18;
-      comp.ratio.value = 6;
-      comp.attack.value = 0.003;
-      comp.release.value = 0.2;
-      this.master = ctx.createGain();
-      this.master.gain.value = 0.8;
-      this.bus = ctx.createGain();
-      this.bus.connect(comp).connect(this.master).connect(ctx.destination);
-
-      this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
-      const d = this.noise.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-
-      this.verb = ctx.createConvolver();
-      const len = ctx.sampleRate * 2.6;
-      const ir = ctx.createBuffer(2, len, ctx.sampleRate);
-      for (let c = 0; c < 2; c++) {
-        const ch = ir.getChannelData(c);
-        for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-      }
-      this.verb.buffer = ir;
-      const verbGain = ctx.createGain();
-      verbGain.gain.value = 0.35;
-      this.verb.connect(verbGain).connect(this.bus);
-      this.startAmbient();
+      this.attach(new AudioContext());
     } catch {
       this.ctx = undefined;
     }
+  }
+
+  /** 任意のコンテキストに音響グラフを組む。OfflineAudioContext を渡せば音量の計測にも使える */
+  attach(ctx: BaseAudioContext, ambient = true) {
+    this.ctx = ctx;
+    // 音が重なっても割れたりうるさくなりすぎないよう、最終段にコンプレッサーを置く
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.ratio.value = 6;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.2;
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.8;
+    this.bus = ctx.createGain();
+    this.bus.connect(comp).connect(this.master).connect(ctx.destination);
+
+    this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = this.noise.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+
+    this.verb = ctx.createConvolver();
+    const len = ctx.sampleRate * 2.6;
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const ch = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    }
+    this.verb.buffer = ir;
+    const verbGain = ctx.createGain();
+    verbGain.gain.value = 0.35;
+    this.verb.connect(verbGain).connect(this.bus);
+    if (ambient) this.startAmbient();
   }
 
   private startAmbient() {
     const ctx = this.ctx!;
     const g = ctx.createGain();
     g.gain.value = 0.0001;
-    g.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + 4);
+    g.gain.exponentialRampToValueAtTime(0.009, ctx.currentTime + 4);
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
     lp.frequency.value = 180;
@@ -158,23 +162,25 @@ export class Sfx {
   /** キー入力：機械的なクリック + 音程のある電子ブリップ。勢いが増すほど音程が上がる */
   key(intensity: number) {
     if (!this.budget()) return;
-    this.burst(0.018, 0.12, 'bandpass', 2500 + Math.random() * 2500, { q: 3 });
+    this.burst(0.025, 0.36, 'bandpass', 2500 + Math.random() * 2500, { q: 3 });
+    // 低い「コトッ」という胴鳴りを足して、電子音だけの軽さを消しメカニカルな打鍵感を出す
+    this.osc('sine', 230, 110, 0.03, 0.2);
     const step = PENTA[Math.min(PENTA.length - 1, Math.floor(Math.random() * 5 + intensity * 6))];
     const f = 660 * Math.pow(2, step / 12);
-    this.osc('square', f, f, 0.035, 0.035, { filter: 3500 });
+    this.osc('square', f, f, 0.045, 0.1, { filter: 3500 });
   }
 
   backspace() {
     if (!this.budget()) return;
-    this.osc('square', 440, 220, 0.05, 0.04, { filter: 2000 });
+    this.osc('square', 440, 220, 0.05, 0.15, { filter: 2000 });
   }
 
   /** Enter：鋭い下降スイープ + 低音のドン */
   enter() {
     if (!this.budget(20)) return;
-    this.osc('sawtooth', 1800, 90, 0.18, 0.12, { filter: 4000, verb: 0.3 });
-    this.osc('sine', 120, 40, 0.25, 0.5);
-    this.burst(0.08, 0.2, 'highpass', 3000);
+    this.osc('sawtooth', 1800, 90, 0.18, 0.09, { filter: 4000, verb: 0.3 });
+    this.osc('sine', 120, 40, 0.25, 0.35);
+    this.burst(0.08, 0.14, 'highpass', 3000);
   }
 
   /** ログ行：細かい電子音。間引かないとうるさいので最短間隔を設ける */
@@ -184,19 +190,19 @@ export class Sfx {
     if (now - this.lastTick < 45) return;
     this.lastTick = now;
     const base = cls === 'dim' ? 2600 : 1800;
-    this.osc('sine', base + Math.random() * 800, base, 0.02, 0.025);
+    this.osc('sine', base + Math.random() * 800, base, 0.02, 0.09);
   }
 
   ok() {
     if (!this.budget()) return;
-    this.osc('triangle', 1318, 1318, 0.07, 0.08, { verb: 0.2 });
-    this.osc('triangle', 1976, 1976, 0.12, 0.07, { at: 0.07, verb: 0.3 });
+    this.osc('triangle', 1318, 1318, 0.07, 0.16, { verb: 0.2 });
+    this.osc('triangle', 1976, 1976, 0.12, 0.14, { at: 0.07, verb: 0.3 });
   }
 
   warn() {
     if (!this.budget()) return;
     for (let i = 0; i < 3; i++) {
-      this.osc('sawtooth', i % 2 ? 620 : 470, i % 2 ? 620 : 470, 0.11, 0.07, { at: i * 0.13, filter: 2500 });
+      this.osc('sawtooth', i % 2 ? 620 : 470, i % 2 ? 620 : 470, 0.11, 0.13, { at: i * 0.13, filter: 2500 });
     }
   }
 
@@ -204,23 +210,23 @@ export class Sfx {
   alarm(level = 1) {
     if (!this.ctx || this.muted) return;
     for (let i = 0; i < 2; i++) {
-      this.osc('sawtooth', 700, 1050, 0.22, 0.09 * level, { at: i * 0.26, filter: 3000, verb: 0.2 });
+      this.osc('sawtooth', 700, 1050, 0.22, 0.2 * level, { at: i * 0.26, filter: 3000, verb: 0.2 });
     }
-    this.osc('sine', 60, 40, 0.3, 0.3 * level);
+    this.osc('sine', 60, 40, 0.3, 0.45 * level);
   }
 
   /** 対抗措置：鋭いザップ。追跡が迫るほど音程が下がって緊迫感を出す */
   counter(danger: number) {
     if (!this.budget()) return;
     const f = 2400 - danger * 1400 + Math.random() * 400;
-    this.osc('square', f, f / 3, 0.05, 0.04, { filter: 5000 });
-    this.burst(0.02, 0.06, 'highpass', 5000);
+    this.osc('square', f, f / 3, 0.05, 0.15, { filter: 5000 });
+    this.burst(0.02, 0.2, 'highpass', 5000);
   }
 
   /** 進捗バー中の連続電子音（解析中の雰囲気） */
   scanBlip(p: number) {
     if (!this.budget()) return;
-    this.osc('sine', 900 + p * 1400, 900 + p * 1400, 0.03, 0.03);
+    this.osc('sine', 900 + p * 1400, 900 + p * 1400, 0.03, 0.1);
   }
 
   /** ステージ突破：上昇アルペジオ */
@@ -293,17 +299,17 @@ export class Sfx {
   /** 画面グリッチに合わせたデジタルノイズ */
   glitch() {
     if (!this.budget()) return;
-    for (let i = 0; i < 5; i++) this.osc('square', 80 + Math.random() * 2000, 60 + Math.random() * 300, 0.04, 0.05, { at: i * 0.03 });
-    this.burst(0.15, 0.12, 'bandpass', 1500, { q: 8, sweepTo: 6000 });
+    for (let i = 0; i < 5; i++) this.osc('square', 80 + Math.random() * 2000, 60 + Math.random() * 300, 0.04, 0.1, { at: i * 0.03 });
+    this.burst(0.15, 0.22, 'bandpass', 1500, { q: 8, sweepTo: 6000 });
   }
 
   /** 文字が崩れ落ちるときの下降グリッチ */
   crumble() {
     if (!this.ctx || this.muted) return;
     for (let i = 0; i < 6; i++) {
-      this.osc('square', 1200 - i * 150, 100, 0.25, 0.03, { at: i * 0.07, filter: 3000 });
+      this.osc('square', 1200 - i * 150, 100, 0.25, 0.06, { at: i * 0.07, filter: 3000 });
     }
-    this.burst(1.0, 0.08, 'bandpass', 4000, { sweepTo: 200, q: 4 });
+    this.burst(1.0, 0.16, 'bandpass', 4000, { sweepTo: 200, q: 4 });
   }
 }
 
