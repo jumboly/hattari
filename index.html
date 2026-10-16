@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HATTARI</title>
+  </head>
+  <body>
+    <div id="stage">
+      <header id="hud">
+        <div class="brand">HATTARI<span>//construct shell</span></div>
+        <div id="pipeline"></div>
+        <div class="right">
+          <div id="signal" title="typing intensity"></div>
+          <div id="clock"></div>
+          <button id="mute" type="button" aria-label="toggle sound">SND ON</button>
+        </div>
+      </header>
+      <main id="term" aria-live="off"></main>
+      <footer id="foot">
+        <span id="target"></span>
+        <span class="tip">TYPE ANYTHING · ⏎ EXECUTE · MASH TO ACCELERATE</span>
+      </footer>
+    </div>
+    <div id="fx"></div>
+    <div id="crt"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
