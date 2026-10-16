@@ -3,6 +3,8 @@
 映画のハッキングシーンを「演奏」したり「鑑賞」したりするブラウザアプリ。
 適当にキーボードを叩くだけで、架空のサイバースペースに侵入する映画的な演出が展開されます。
 
+**公開ページ: https://www.jumboly.jp/hattari/** （サウンドラボ: https://www.jumboly.jp/hattari/lab.html）
+
 > 実際のネットワーク通信・スキャン・攻撃は一切行いません。画面上のコマンドやログはすべて架空の SF 用語による演出です。
 
 ## 起動
@@ -51,6 +53,10 @@ npm test         # 自動テスト（Vitest）
 | key / ok | -32〜-33 | 打鍵（実機のメカニカルキーボード風） |
 | scanBlip / tick | -43〜-46 | 処理中の質感 |
 | ambient | -40 | サーバールームのハムとファン |
+
+## 公開
+
+`main` に push すると GitHub Actions（`.github/workflows/deploy.yml`）がテスト・ビルドして GitHub Pages に公開します。
 
 ## 構成
 
