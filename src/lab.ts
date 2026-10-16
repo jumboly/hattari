@@ -1,6 +1,6 @@
 // サウンドラボ：効果音を個別・場面単位で試聴し、音量を数値で比べるための開発用ページ。
 // 本編と同じ Sfx を使い、OfflineAudioContext で書き出して計測するので、耳と数値の両方で調整できる。
-import { Sfx } from './audio';
+import { Sfx, type Profile } from './audio';
 
 type Cue = [number, (s: Sfx) => void];
 interface Item {
@@ -61,9 +61,11 @@ const SCENES: Item[] = [
 // ---------- 再生 ----------
 let live: Sfx | undefined;
 let ambient = false;
+let profile: Profile = 'matrix';
 function liveSfx() {
   if (!live) {
     live = new Sfx();
+    live.profile = profile;
     live.attach(new AudioContext(), ambient);
   }
   return live;
@@ -82,6 +84,7 @@ async function measure(item: Item) {
   const PRE = 0.25;
   const ctx = new OfflineAudioContext(2, Math.ceil(sr * (item.len + PRE)), sr);
   const s = new Sfx();
+  s.profile = profile;
   s.attach(ctx, item.name === 'ambient');
   // suspend で時刻を止めてから呼ぶことで、本番と同じ「今鳴らす」API のまま時間差のある場面を書き出せる
   // suspend で時刻を止めてから呼ぶことで、本番と同じ「今鳴らす」API のまま時間差のある場面を書き出せる。
@@ -144,5 +147,13 @@ document.getElementById('amb')!.addEventListener('change', (e) => {
   ambient = (e.target as HTMLInputElement).checked;
   live = undefined; // 環境音の有無はグラフ構築時に決まるので作り直す
 });
-render('scenes', SCENES);
-render('sounds', SOUNDS);
+function renderAll() {
+  render('scenes', SCENES);
+  render('sounds', SOUNDS);
+}
+document.getElementById('profile')!.addEventListener('change', (e) => {
+  profile = (e.target as HTMLSelectElement).value as Profile;
+  live = undefined;
+  renderAll();
+});
+renderAll();

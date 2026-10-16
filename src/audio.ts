@@ -2,6 +2,8 @@
 // ゲーム的に聞こえないよう、音階のある電子音は控えめにし、実機の打鍵音・機械音・映画的なインパクトを中心にしている。
 // 自動再生制限のため AudioContext は最初のユーザー操作で生成し、それまでは全メソッドが無音で no-op になる。
 
+export type Profile = 'matrix' | 'retro' | 'hollywood' | 'cyberpunk';
+
 export class Sfx {
   private ctx?: BaseAudioContext;
   private master!: GainNode;
@@ -11,6 +13,11 @@ export class Sfx {
   private lastTick = 0;
   private recentVoices: number[] = [];
   muted = false;
+  /** テーマごとの音の性格。見た目のテーマと同じ id を使う */
+  profile: Profile = 'matrix';
+  private ambientOn = false;
+  private ambientOut?: GainNode;
+  private ambientSrc: AudioScheduledSourceNode[] = [];
 
   get unlocked() {
     return !!this.ctx && this.ctx.state === 'running';
@@ -58,41 +65,104 @@ export class Sfx {
     const verbGain = ctx.createGain();
     verbGain.gain.value = 0.35;
     this.verb.connect(verbGain).connect(this.bus);
+    this.ambientOn = ambient;
     if (ambient) this.startAmbient();
   }
 
-  /** サーバールームのような環境音。電源のハム（60Hz とその倍音）と、空調ファンの低い風切りで「機械のある部屋」にする */
-  private startAmbient() {
+  /** テーマ切替。環境音はクロスフェードで差し替える */
+  setProfile(p: Profile) {
+    if (p === this.profile) return;
+    this.profile = p;
+    if (!this.ctx || !this.ambientOn) return;
+    const t = this.ctx.currentTime;
+    this.ambientOut?.gain.setTargetAtTime(0.0001, t, 0.4);
+    for (const n of this.ambientSrc) n.stop(t + 2);
+    this.startAmbient();
+  }
+
+  private loopSrc(out: AudioNode, make: (ctx: BaseAudioContext) => AudioScheduledSourceNode) {
+    const n = make(this.ctx!);
+    n.connect(out);
+    n.start();
+    this.ambientSrc.push(n);
+    return n;
+  }
+
+  private tone(out: AudioNode, f: number, a: number, type: OscillatorType = 'sine') {
     const ctx = this.ctx!;
     const g = ctx.createGain();
-    g.gain.value = 0.0001;
-    g.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 4);
-    g.connect(this.bus);
-    for (const [f, a] of [[60, 0.012], [120, 0.006], [180, 0.002]] as const) {
+    g.gain.value = a;
+    g.connect(out);
+    this.loopSrc(g, () => {
       const o = ctx.createOscillator();
+      o.type = type;
       o.frequency.value = f;
-      const og = ctx.createGain();
-      og.gain.value = a;
-      o.connect(og).connect(g);
-      o.start();
+      return o;
+    });
+  }
+
+  private noiseBed(out: AudioNode, type: BiquadFilterType, freq: number, a: number, q = 1) {
+    const ctx = this.ctx!;
+    const f = ctx.createBiquadFilter();
+    f.type = type;
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = ctx.createGain();
+    g.gain.value = a;
+    f.connect(g).connect(out);
+    this.loopSrc(f, () => {
+      const src = ctx.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      return src;
+    });
+    return f;
+  }
+
+  /** テーマごとの環境音。どれもごく小さく鳴らし、静寂演出（hush）ではバスごと消えて落差を作る */
+  private startAmbient() {
+    const ctx = this.ctx!;
+    this.ambientSrc = [];
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    g.gain.exponentialRampToValueAtTime(1, ctx.currentTime + 3);
+    g.connect(this.bus);
+    this.ambientOut = g;
+    switch (this.profile) {
+      case 'retro': {
+        // ブラウン管の高周波（水平偏向）のキーンと、古い電源トランスの唸り
+        this.tone(g, 15734, 0.004);
+        this.tone(g, 50, 0.012);
+        this.tone(g, 100, 0.008);
+        this.noiseBed(g, 'lowpass', 300, 0.012);
+        break;
+      }
+      case 'cyberpunk': {
+        // 窓の外の雨と、ネオン管のジーという唸り
+        this.noiseBed(g, 'bandpass', 3500, 0.03, 0.6);
+        this.noiseBed(g, 'lowpass', 400, 0.02);
+        const buzz = ctx.createBiquadFilter();
+        buzz.type = 'lowpass';
+        buzz.frequency.value = 900;
+        buzz.connect(g);
+        this.tone(buzz, 120, 0.006, 'sawtooth');
+        break;
+      }
+      default: {
+        // サーバールーム：電源のハム（60Hz とその倍音）と空調ファンの風切り
+        for (const [f, a] of [[60, 0.012], [120, 0.006], [180, 0.002]] as const) this.tone(g, f, a);
+        const fan = this.noiseBed(g, 'lowpass', 500, 0.02);
+        // ファンの回転ムラを模して、風切りの帯域をゆっくり揺らす
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 120;
+        lfoGain.connect(fan.frequency);
+        this.loopSrc(lfoGain, () => {
+          const o = ctx.createOscillator();
+          o.frequency.value = 0.11;
+          return o;
+        });
+      }
     }
-    const fan = ctx.createBufferSource();
-    fan.buffer = this.noise;
-    fan.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = 500;
-    const fg = ctx.createGain();
-    fg.gain.value = 0.02;
-    // ファンの回転ムラを模して、風切りの帯域をゆっくり揺らす
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.11;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 120;
-    lfo.connect(lfoGain).connect(lp.frequency);
-    lfo.start();
-    fan.connect(lp).connect(fg).connect(g);
-    fan.start();
   }
 
   setMuted(m: boolean) {
@@ -192,7 +262,25 @@ export class Sfx {
     // 数字・記号の段は手前の文字キーより少し高く乾いた音にする
     const row = /[0-9\-=`]/.test(key) ? 1.25 : 1;
     const body = (1300 + ((code * 37) % 11) * 90) * row * (0.97 + Math.random() * 0.06);
-    this.keyClick(v, body, 1);
+    switch (this.profile) {
+      case 'retro':
+        // バネ式（バックリングスプリング）キーボード：大きなカシャンと、バネの金属的なキーン
+        this.keyClick(v * 1.15, body * 0.9, 1.3);
+        this.burst(0.07, 0.07 * v, 'bandpass', 3000 + ((code * 53) % 7) * 120, { q: 30, at: 0.006, a: 0.001 });
+        break;
+      case 'cyberpunk':
+        // 薄型キーボード：浅く低いコトコト + ごく小さな電気のパチッ
+        this.keyClick(v * 0.8, body * 0.75, 1.4);
+        this.burst(0.006, 0.08 * v, 'bandpass', 7000, { q: 3, at: 0.01, a: 0.0005 });
+        break;
+      case 'hollywood':
+        // 映画の端末は打鍵ごとに小さく電子音が鳴る（音階には乗せず、キーで決まった高さ）
+        this.keyClick(v * 0.9, body, 1);
+        this.osc('sine', 2200 + ((code * 29) % 9) * 110, 2200 + ((code * 29) % 9) * 110, 0.022, 0.035, { at: 0.004 });
+        break;
+      default:
+        this.keyClick(v, body, 1);
+    }
   }
 
   /** スペースバー：長いキー特有の低い胴鳴りと、スタビライザーのカタつき */
@@ -222,15 +310,44 @@ export class Sfx {
     const now = performance.now();
     if (now - this.lastTick < 45) return;
     this.lastTick = now;
-    this.burst(0.004, cls === 'dim' ? 0.1 : 0.16, 'highpass', 5000 + Math.random() * 3000, { a: 0.0005 });
-    this.burst(0.008, 0.08, 'bandpass', 2000 + Math.random() * 1500, { q: 10, a: 0.0005 });
+    const lv = cls === 'dim' ? 0.6 : 1;
+    switch (this.profile) {
+      case 'retro':
+        // ドットプリンタのヘッドが走る「ジジッ」
+        for (let i = 0; i < 4; i++) this.burst(0.004, 0.36 * lv, 'bandpass', 1400 + Math.random() * 300, { q: 6, at: i * 0.011, a: 0.0005 });
+        break;
+      case 'hollywood':
+        this.osc('sine', 1900 + Math.random() * 900, 1900 + Math.random() * 900, 0.016, 0.06 * lv);
+        break;
+      case 'cyberpunk':
+        this.burst(0.012, 0.36 * lv, 'bandpass', 4000 + Math.random() * 3000, { q: 5, sweepTo: 1500, a: 0.0005 });
+        break;
+      default:
+        this.burst(0.004, 0.16 * lv, 'highpass', 5000 + Math.random() * 3000, { a: 0.0005 });
+        this.burst(0.008, 0.08, 'bandpass', 2000 + Math.random() * 1500, { q: 10, a: 0.0005 });
+    }
   }
 
   /** 成功行：映画の端末 UI のような控えめな単発の確認音 */
   ok() {
     if (!this.budget()) return;
-    this.osc('sine', 1568, 1568, 0.09, 0.1, { verb: 0.25 });
-    this.osc('sine', 3136, 3136, 0.05, 0.025);
+    switch (this.profile) {
+      case 'retro':
+        // PC 内蔵スピーカーの短いビープ。安っぽい紙コーンの帯域に絞る
+        this.osc('square', 880, 880, 0.07, 0.09, { filter: 2500 });
+        break;
+      case 'hollywood':
+        // 映画のコンピュータの定番、二音の確認音
+        this.osc('sine', 1175, 1175, 0.06, 0.08, { verb: 0.2 });
+        this.osc('sine', 1760, 1760, 0.1, 0.08, { at: 0.065, verb: 0.25 });
+        break;
+      case 'cyberpunk':
+        this.osc('sine', 900, 1800, 0.12, 0.08, { verb: 0.4 });
+        break;
+      default:
+        this.osc('sine', 1568, 1568, 0.09, 0.1, { verb: 0.25 });
+        this.osc('sine', 3136, 3136, 0.05, 0.025);
+    }
   }
 
   /** 警告行：低いシンセの二連パルス */
@@ -268,10 +385,42 @@ export class Sfx {
   /** ステージ突破：吸い込む風切り音 → 重い着地音 → 遠くで響く高音 */
   stageClear() {
     if (!this.ctx || this.muted) return;
+    if (this.profile === 'retro') return this.modem();
+    if (this.profile === 'hollywood') return this.braam();
+    if (this.profile === 'cyberpunk') return this.synthRise();
     this.burst(0.05, 0.18, 'bandpass', 400, { q: 2, sweepTo: 5000, a: 0.32 });
     this.osc('sine', 80, 35, 0.6, 0.5, { at: 0.35, a: 0.004 });
     this.burst(0.4, 0.35, 'lowpass', 1800, { sweepTo: 100, at: 0.35, verb: 0.4 });
     this.osc('sine', 2637, 2637, 0.6, 0.05, { at: 0.36, verb: 0.6 });
+  }
+
+  /** モデムの接続音（ダイヤル後のピーとガーの圧縮版） */
+  private modem() {
+    this.osc('sine', 2100, 2100, 0.25, 0.16, { filter: 3000 });
+    for (let i = 0; i < 8; i++) {
+      const f = i % 2 ? 1850 : 1650;
+      this.osc('sine', f, f, 0.035, 0.14, { at: 0.28 + i * 0.04 });
+    }
+    this.burst(0.45, 0.25, 'bandpass', 1800, { q: 1.5, at: 0.6, a: 0.02 });
+    this.osc('sine', 60, 40, 0.3, 0.5, { at: 0.6 });
+  }
+
+  /** 映画予告編の「ブォーン」：低い金管のようなノコギリ波の束 + 重低音 */
+  private braam() {
+    for (const hz of [55, 82.4, 110]) {
+      for (const d of [-8, 8]) {
+        this.osc('sawtooth', hz * Math.pow(2, d / 1200), hz * 0.98, 0.9, 0.06, { filter: 900, verb: 0.5, a: 0.05 });
+      }
+    }
+    this.osc('sine', 60, 30, 0.9, 0.5, { a: 0.01 });
+  }
+
+  /** 上昇するシンセのうねりから重低音へ */
+  private synthRise() {
+    this.osc('sawtooth', 110, 880, 0.35, 0.06, { filter: 2500, a: 0.25 });
+    this.osc('sawtooth', 111, 885, 0.35, 0.06, { filter: 2500, a: 0.25 });
+    this.osc('sine', 70, 32, 0.7, 0.5, { at: 0.6, a: 0.004 });
+    this.burst(0.35, 0.25, 'lowpass', 2500, { sweepTo: 120, at: 0.6, verb: 0.5 });
   }
 
   /** 静寂：全体をダッキングし、かすかな上昇ノイズだけ残して緊張を作る */

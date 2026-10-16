@@ -1,5 +1,5 @@
 import './style.css';
-import { sfx } from './audio';
+import { sfx, type Profile } from './audio';
 import { STAGES } from './content';
 import { Demo } from './demo';
 import { Fx } from './fx';
@@ -175,6 +175,7 @@ const themeBtn = $('theme');
 themeBtn.addEventListener('click', (e) => {
   const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
   applyTheme(next);
+  sfx.setProfile(next.id as Profile);
   themeBtn.textContent = next.label;
   fx.flash('white');
   rain.wave();

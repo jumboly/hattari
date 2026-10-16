@@ -20,7 +20,10 @@
   <body>
     <h1>HATTARI // SOUND LAB</h1>
     <p>各効果音と典型的な場面を単体で試聴できます。数値はオフラインで書き出した音の最大音量（短時間 RMS / ピーク、dBFS）です。</p>
-    <div><label><input type="checkbox" id="amb" /> 環境音（低音ドローン）を鳴らす</label></div>
+    <div>
+      <label>テーマ <select id="profile"><option>matrix</option><option>retro</option><option>hollywood</option><option>cyberpunk</option></select></label>
+      <label><input type="checkbox" id="amb" /> 環境音を鳴らす</label>
+    </div>
     <h2>SCENES</h2>
     <table id="scenes"></table>
     <h2>SOUNDS</h2>
