@@ -177,10 +177,30 @@ export class Sfx {
     this.burst(0.03, 0.4 * v * thock, 'lowpass', 450 + r() * 200, { at: 0.008, a: 0.001 });
   }
 
-  /** キー入力。強く速く叩いているほど、少しだけ強いタッチになる */
-  key(intensity: number) {
+  /**
+   * キー入力。実機ではキーの位置ごとに筐体の響き方が違うので、文字から決まった共振の高さを割り当てる
+   * （同じキーは毎回ほぼ同じ音、違うキーは少し違う音になる）。強く速く叩いているほど少しだけ強いタッチになる
+   */
+  key(intensity: number, key = '') {
     if (!this.budget()) return;
-    this.keyClick((0.8 + Math.random() * 0.3) * (0.9 + intensity * 0.2), 1400 + Math.random() * 900, 1);
+    const v = (0.8 + Math.random() * 0.3) * (0.9 + intensity * 0.2);
+    if (key === ' ') {
+      this.spaceBar(v);
+      return;
+    }
+    const code = key ? key.toLowerCase().charCodeAt(0) : Math.floor(Math.random() * 64);
+    // 数字・記号の段は手前の文字キーより少し高く乾いた音にする
+    const row = /[0-9\-=`]/.test(key) ? 1.25 : 1;
+    const body = (1300 + ((code * 37) % 11) * 90) * row * (0.97 + Math.random() * 0.06);
+    this.keyClick(v, body, 1);
+  }
+
+  /** スペースバー：長いキー特有の低い胴鳴りと、スタビライザーのカタつき */
+  private spaceBar(v: number) {
+    this.burst(0.008, 0.4 * v, 'highpass', 3000, { a: 0.0005 });
+    this.burst(0.03, 0.4 * v, 'bandpass', 650, { q: 4, at: 0.004, a: 0.001 });
+    this.burst(0.05, 0.55 * v, 'lowpass', 380, { at: 0.009, a: 0.001 });
+    this.burst(0.012, 0.15 * v, 'bandpass', 2600, { q: 8, at: 0.028, a: 0.0008 });
   }
 
   backspace() {

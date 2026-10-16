@@ -29,6 +29,11 @@ export class Demo {
     this.waitingEnter = false;
   }
 
+  /** 人間の打鍵に近い文字の出方にする（スペースが時々混ざる） */
+  private char() {
+    return chance(0.15) ? ' ' : pick([...'asdfghjklqwertyuiopzxcvbnm1234567890']);
+  }
+
   stop() {
     this.active = false;
   }
@@ -76,21 +81,21 @@ export class Demo {
           this.nextAt = now + int(60, 120);
           return;
         }
-        h.key(now);
+        h.key(now, this.char());
         // たまに打ち間違えて消す。完璧すぎる自動入力は機械っぽく見えるため
         if (chance(0.025)) this.typo = int(1, 2);
         this.nextAt = now + this.gap();
         return;
       case 'code':
         if (chance(0.08)) h.enter(now);
-        else h.key(now);
+        else h.key(now, this.char());
         this.nextAt = now + this.gap();
         return;
       case 'running':
         // 実行中は見守るか、連打で加速させるか。慌ただしい気分ほど叩く
         if (this.mood === 'frantic' || (this.mood === 'focused' && chance(0.35))) {
           if (chance(0.06)) h.enter(now);
-          else h.key(now);
+          else h.key(now, this.char());
           this.nextAt = now + this.gap();
         } else {
           this.nextAt = now + int(150, 400);
@@ -103,7 +108,7 @@ export class Demo {
           return;
         }
         if (chance(0.08)) h.enter(now);
-        else h.key(now);
+        else h.key(now, this.char());
         this.nextAt = now + int(60, 110);
         return;
       case 'locked':

@@ -476,6 +476,50 @@ body[data-theme='retro'] .c-ty {
   color: #ff9a5c;
 }
 
+/* Hollywood：青白い映画 UI。背景に細いグリッドを敷いて「解析画面」らしさを出す */
+body[data-theme='hollywood'] #stage {
+  background-image:
+    radial-gradient(ellipse at 50% 55%, rgba(var(--amb-rgb), calc(0.18 + var(--intensity) * 0.2)), transparent 70%),
+    linear-gradient(rgba(var(--fg-rgb), 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--fg-rgb), 0.05) 1px, transparent 1px);
+  background-size: auto, 40px 40px, 40px 40px;
+}
+body[data-theme='hollywood'] .panel {
+  border-radius: 3px;
+}
+body[data-theme='hollywood'] .c-kw {
+  color: #9be7ff;
+}
+body[data-theme='hollywood'] .c-str {
+  color: #ffe08a;
+}
+body[data-theme='hollywood'] .c-num,
+body[data-theme='hollywood'] .c-ty {
+  color: #8affc6;
+}
+
+/* Cyberpunk：ネオンのマゼンタとシアン。文字に色ずれ（色収差）を乗せて安いモニタのにじみを出す */
+body[data-theme='cyberpunk'] #term {
+  text-shadow: -1px 0 rgba(0, 255, 255, 0.55), 1px 0 rgba(255, 0, 170, 0.55), 0 0 10px rgba(255, 63, 210, 0.35);
+}
+body[data-theme='cyberpunk'] .panel {
+  border-color: var(--hi);
+  box-shadow: 0 0 18px rgba(127, 252, 255, 0.25), inset 0 0 20px rgba(255, 63, 210, 0.1);
+}
+body[data-theme='cyberpunk'] .panel > header {
+  background: linear-gradient(90deg, var(--fg), var(--hi));
+}
+body[data-theme='cyberpunk'] .c-kw {
+  color: #7ffcff;
+}
+body[data-theme='cyberpunk'] .c-str {
+  color: #fff176;
+}
+body[data-theme='cyberpunk'] .c-num,
+body[data-theme='cyberpunk'] .c-ty {
+  color: #b388ff;
+}
+
 /* ---------- 画面効果 ---------- */
 #fx {
   position: fixed;

@@ -31,7 +31,7 @@ npm test         # 自動テスト（Vitest）
 
 - **FREE**：自由に叩くモード。ターゲットとステージはランダムに進行する
 - **CINEMA**：台本に沿って映画の主人公を演じるモード。上下に黒帯が出て、タイトルカード → 字幕付きの各場面 → フィナーレ → FIN と進む。終わると次の作品が始まる（OPERATION ORACLE / LAST SIGNAL / BLACK VAULT）。Esc を押すと自動操縦が作品を演じる
-- **MATRIX / RETRO**：テーマ（モードとは独立）
+- **MATRIX / RETRO / HOLLYWOOD / CYBERPUNK**：テーマ（モードとは独立）
 
 最初のキー入力かクリックで音が鳴り始めます（ブラウザの自動再生制限のため）。右上の `SND` で消音できます。
 

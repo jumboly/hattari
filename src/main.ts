@@ -106,7 +106,7 @@ window.addEventListener('keydown', (e) => {
     hack.backspace();
   } else if (e.key.length === 1) {
     takeOver(now);
-    hack.key(now);
+    hack.key(now, e.key);
   } else return; // F キー・矢印・Tab などはブラウザに任せる
   e.preventDefault();
   sfx.unlock();

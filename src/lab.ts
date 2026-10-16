@@ -15,6 +15,8 @@ const one = (name: string, note: string, fn: (s: Sfx) => void, len = 2): Item =>
 const SOUNDS: Item[] = [
   one('key', 'キー入力（勢い 0）', (s) => s.key(0), 0.5),
   one('key (hot)', 'キー入力（勢い 1）', (s) => s.key(1), 0.5),
+  one('key (space)', 'スペースバー', (s) => s.key(0.4, ' '), 0.5),
+  one('key (digit)', '数字キー', (s) => s.key(0.4, '7'), 0.5),
   one('backspace', 'Backspace', (s) => s.backspace(), 0.5),
   one('enter', 'コマンド実行', (s) => s.enter(), 1.5),
   one('tick', 'ログ 1 行', (s) => s.tick('out'), 0.3),
@@ -33,7 +35,7 @@ const SOUNDS: Item[] = [
 const range = (n: number, f: (i: number) => Cue): Cue[] => Array.from({ length: n }, (_, i) => f(i));
 
 const SCENES: Item[] = [
-  { name: 'typing', note: '普通の打鍵 6 打/秒 × 3 秒', len: 3.5, cues: range(18, (i) => [i / 6, (s) => s.key(0.4)]) },
+  { name: 'typing', note: '普通の打鍵 6 打/秒 × 3 秒（文章風）', len: 3.5, cues: range(18, (i) => [i / 6, (s) => s.key(0.4, 'hack the planet ok'[i])]) },
   { name: 'mashing', note: '全力連打 14 打/秒 × 3 秒', len: 3.5, cues: range(42, (i) => [i / 14, (s) => s.key(1)]) },
   {
     name: 'execute',

@@ -100,9 +100,9 @@ export class Hack {
     return 1 + Math.floor(this.intensity * 4 + rand() * 2.2);
   }
 
-  key(now: number) {
+  key(now: number, key = '') {
     this.noteKey(now);
-    sfx.key(this.intensity);
+    sfx.key(this.intensity, key);
     this.onPulse('key');
     switch (this.phase) {
       case 'prompt': {
